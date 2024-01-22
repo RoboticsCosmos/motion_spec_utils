@@ -40,6 +40,14 @@ target_include_directories(mutils PUBLIC
 )
 target_link_libraries(mutils ${orocos_kdl_LIBRARIES})
 
+add_library(solver_utils SHARED src/solver_utils.cpp)
+target_include_directories(solver_utils PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${orocos_kdl_INCLUDE_DIRS}
+)
+target_link_libraries(solver_utils ${orocos_kdl_LIBRARIES})
+
 # install
 install(
   TARGETS math_utils tf_utils mutils

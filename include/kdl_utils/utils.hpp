@@ -1,20 +1,20 @@
 /**
  * Author: Vamsi Kalagaturu
- * 
+ *
  * Description: Library to handle basic utilities for the arm_actions package
  *
  * Copyright (c) [2023]
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- * 
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -22,7 +22,7 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
-*/
+ */
 
 #ifndef UTILS_HPP
 #define UTILS_HPP
@@ -39,15 +39,10 @@
 #include "kdl/tree.hpp"
 #include "kdl_parser/kdl_parser.hpp"
 
-enum ENV
-{
-  SIM,
-  ROB
-};
+enum ENV { SIM, ROB };
 
-class Utils
-{
-public:
+class Utils {
+ public:
   Utils();
   ~Utils();
 
@@ -59,28 +54,33 @@ public:
 
   /**
    * @brief Get the names of all links in a KDL::Chain.
-   * @param chain The KDL::Chain object representing a subset of the robot's kinematic chain.
+   * @param chain The KDL::Chain object representing a subset of the robot's
+   * kinematic chain.
    * @return A vector containing the names of all links in the chain.
    */
   static std::vector<std::string> getLinkNamesFromChain(KDL::Chain& chain);
 
   /**
    * @brief Get the id of a link in a KDL::Chain.
-   * @param chain The KDL::Chain object representing a subset of the robot's kinematic chain.
+   * @param chain The KDL::Chain object representing a subset of the robot's
+   * kinematic chain.
    * @param link_name The name of the link.
    * @return The id of the link.
    */
-  static int getLinkIdFromChain(KDL::Chain& chain, const std::string& link_name);
+  static int getLinkIdFromChain(KDL::Chain& chain,
+                                const std::string& link_name);
 
   /**
    * @brief Check if the given link name is in the KDL::Chain.
-   * @param chain The KDL::Chain object representing a subset of the robot's kinematic chain.
+   * @param chain The KDL::Chain object representing a subset of the robot's
+   * kinematic chain.
    */
   static bool checkLinkInChain(KDL::Chain& chain, const std::string& link_name);
 
   /**
    * @brief Prints the names of all joints in a KDL::Chain.
-   * @param chain The KDL::Chain object representing a subset of the robot's kinematic chain.
+   * @param chain The KDL::Chain object representing a subset of the robot's
+   * kinematic chain.
    */
   static void printJointNames(KDL::Chain& chain);
 
@@ -101,16 +101,18 @@ public:
   static void printJntArr(const T& jntArr);
 
   /**
-   * @brief Initializes the robot using a URDF file and sets the initial joint angles.
+   * @brief Initializes the robot using a URDF file and sets the initial joint
+   * angles.
    * @param urdf_path The file path to the robot's URDF description.
    * @param robot_chain [out] The KDL chain representing the robot.
    * @param base_link The name of the robot's base link.
    * @param tool_link The name of the robot's tool link.
    * @return 0 on success, -1 on failure.
    */
-  int initialize_robot_urdf(
-      const std::string& urdf_path, KDL::Chain& robot_chain, const std::string& base_link,
-      const std::string& tool_link);
+  int initialize_robot_urdf(const std::string& urdf_path,
+                            KDL::Chain& robot_chain,
+                            const std::string& base_link,
+                            const std::string& tool_link);
 
   /**
    * @brief Initializes the q with the initial joint angles.
@@ -119,9 +121,10 @@ public:
    * @param env a ENV enum value representing the environment the robot is in.
    * @return 0 on success, -1 on failure.
    */
-  int init_q(KDL::Chain* robot_chain, KDL::JntArray& q,
-             const std::vector<double>& initial_joint_angles = std::vector<double>(),
-             ENV env = ENV::SIM);
+  int init_q(
+      KDL::Chain* robot_chain, KDL::JntArray& q,
+      const std::vector<double>& initial_joint_angles = std::vector<double>(),
+      ENV env = ENV::SIM);
 
   /**
    * @brief Computes the euclidean distance between two 3d points.
@@ -139,7 +142,8 @@ public:
    * @param p2 The second point (x2, y2, z2).
    * @return The error as a tuple (dx, dy, dz).
    */
-  std::vector<double> calc_error(const std::array<double, 3>& p1, const std::array<double, 3>& p2);
+  std::vector<double> calc_error(const std::array<double, 3>& p1,
+                                 const std::array<double, 3>& p2);
 
   /**
    * @brief Calculates the error between two kdl vectors.
