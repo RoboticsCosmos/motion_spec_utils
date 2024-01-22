@@ -1,7 +1,9 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.10.0)
 project(kdl_utils VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
+
+set(CMAKE_INSTALL_DIR share/${PROJECT_NAME}/cmake)
 
 find_package(orocos_kdl REQUIRED)
 find_package(kdl_parser REQUIRED)
@@ -9,45 +11,38 @@ find_package(kdl_parser REQUIRED)
 # includes
 include_directories(
   include
-)
-
-add_library(fixed_size_queue SHARED
-  src/fixed_size_queue.cpp
+  ${orocos_kdl_INCLUDE_DIRS}
 )
 
 # add library
-add_library(math_utils SHARED
-  src/math_utils.cpp
+add_library(math_utils SHARED src/math_utils.cpp)
+target_include_directories(math_utils PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${orocos_kdl_INCLUDE_DIRS}
 )
+target_link_libraries(math_utils ${orocos_kdl_LIBRARIES})
 
-# link libraries
-target_link_libraries(math_utils
-  ${orocos_kdl_LIBRARIES}
-  fixed_size_queue
+add_library(tf_utils SHARED src/tf_utils.cpp)
+target_include_directories(tf_utils PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${orocos_kdl_INCLUDE_DIRS}
 )
+target_link_libraries(tf_utils ${orocos_kdl_LIBRARIES})
 
-add_library(tf_utils SHARED
-  src/tf_utils.cpp
+add_library(mutils SHARED src/utils.cpp)
+target_include_directories(mutils PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${orocos_kdl_INCLUDE_DIRS}
+  
 )
-
-# link libraries
-target_link_libraries(tf_utils
-  ${orocos_kdl_LIBRARIES}
-)
-
-add_library(utils SHARED
-  src/utils.cpp
-)
-
-# link libraries
-target_link_libraries(utils
-  ${orocos_kdl_LIBRARIES}
-  ${kdl_parser_LIBRARIES}
-)
+target_link_libraries(mutils ${orocos_kdl_LIBRARIES})
 
 # install
 install(
-  TARGETS fixed_size_queue math_utils tf_utils utils
+  TARGETS math_utils tf_utils mutils
   EXPORT ${PROJECT_NAME}-targets
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
