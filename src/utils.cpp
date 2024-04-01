@@ -26,155 +26,253 @@
 
 #include "kdl_utils/utils.hpp"
 
-Utils::Utils() {}
+#include "kdl/chainhdsolver_vereshchagin.hpp"
+#include "kdl/kinfam_io.hpp"
 
-Utils::~Utils() {}
+void initialize_robot_state(int num_joints, int num_segments, Kinova *rob)
+{
+  rob->nj = num_joints;
+  rob->ns = num_segments;
 
-void Utils::printLinkNames(KDL::Tree& tree) {
-  std::vector<std::string> link_names;
+  rob->q = new double[num_joints]{};
+  rob->q_dot = new double[num_joints]{};
+  rob->q_ddot = new double[num_joints]{};
 
-  // get all segments
-  KDL::SegmentMap segments = tree.getSegments();
+  rob->s = new double *[num_segments];
+  rob->s_dot = new double *[num_segments];
+  rob->s_ddot = new double *[num_segments];
 
-  // iterate through all segments
-  for (auto segment : segments) {
-    // get the name of the segment
-    std::string name = segment.first;
-
-    // add the name to the vector
-    link_names.push_back(name);
+  for (size_t i = 0; i < num_segments; i++)
+  {
+    rob->s[i] = new double[6]{};
+    rob->s_dot[i] = new double[6]{};
+    rob->s_ddot[i] = new double[6]{};
   }
-
-  // print the link names
-  std::cout << "Link names: " << std::endl;
-  for (int i = 0; i < link_names.size(); i++) {
-    std::cout << link_names[i] << std::endl;
-  }
-  std::cout << std::endl;
 }
 
-std::vector<std::string> Utils::getLinkNamesFromChain(KDL::Chain& chain) {
-  std::vector<std::string> link_names;
-  for (int i = 0; i < chain.getNrOfSegments(); i++) {
-    link_names.push_back(chain.getSegment(i).getName());
+void initialize_robot_state(int num_joints, int num_segments, double *init_q, Kinova *rob)
+{
+  rob->nj = num_joints;
+  rob->ns = num_segments;
+
+  rob->q = new double[num_joints]{};
+  rob->q_dot = new double[num_joints]{};
+  rob->q_ddot = new double[num_joints]{};
+
+  rob->s = new double *[num_segments];
+  rob->s_dot = new double *[num_segments];
+  rob->s_ddot = new double *[num_segments];
+
+  for (size_t i = 0; i < num_segments; i++)
+  {
+    rob->s[i] = new double[6]{};
+    rob->s_dot[i] = new double[6]{};
+    rob->s_ddot[i] = new double[6]{};
   }
 
-  return link_names;
+  for (size_t i = 0; i < num_joints; i++)
+  {
+    rob->q[i] = init_q[i];
+  }
 }
 
-int Utils::getLinkIdFromChain(KDL::Chain& chain, const std::string& link_name) {
-  for (int i = 0; i < chain.getNrOfSegments(); i++) {
-    if (chain.getSegment(i).getName() == link_name) {
-      return i;
-    }
-  }
-
-  return -1;
-}
-
-bool Utils::checkLinkInChain(KDL::Chain& chain, const std::string& link_name) {
-  std::vector<std::string> link_names = getLinkNamesFromChain(chain);
-
-  for (int i = 0; i < link_names.size(); i++) {
-    if (link_names[i] == link_name) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-void Utils::printJointNames(KDL::Chain& chain) {
-  std::vector<std::string> joint_names;
-  for (int i = 0; i < chain.getNrOfSegments(); i++) {
-    joint_names.push_back(chain.getSegment(i).getJoint().getName());
-  }
-
-  std::cout << "Joint names: " << std::endl;
-  for (int i = 0; i < joint_names.size(); i++) {
-    std::cout << joint_names[i] << std::endl;
-  }
-  std::cout << std::endl;
-}
-
-template <typename T>
-void Utils::printVec(const T& vec) {
-  std::cout << "[";
-  for (int i = 0; i < vec.size(); ++i) {
-    std::cout << vec[i] << ", ";
-    if (i != vec.size() - 1) {
-      std::cout << ", ";
-    }
-  }
-  std::cout << "]" << std::endl;
-}
-
-template <typename T>
-void Utils::printJntArr(const T& jntArr) {
-  std::cout << "[";
-  for (int i = 0; i < jntArr.rows(); ++i) {
-    std::cout << jntArr(i);
-    if (i != jntArr.rows() - 1) {
-      std::cout << ", ";
-    }
-  }
-  std::cout << "]" << std::endl;
-}
-
-int Utils::initialize_robot_urdf(const std::string& urdf_path,
-                                 KDL::Chain& robot_chain,
-                                 const std::string& base_link,
-                                 const std::string& tool_link) {
+void initialize_robot_chain(std::string robot_urdf, std::string base_link, std::string tool_link,
+                            KDL::Chain &robot_chain)
+{
   KDL::Tree robot_tree;
 
-  // load the robot URDF into the KDL tree
-  if (!kdl_parser::treeFromFile(urdf_path, robot_tree)) {
-    std::cout << "Failed to construct KDL tree" << std::endl;
-    return -1;
+  // load the robot urdf
+  if (!kdl_parser::treeFromFile(robot_urdf, robot_tree))
+  {
+    std::cerr << "Failed to construct KDL tree" << std::endl;
   }
 
-  // create the KDL chain
-  if (!robot_tree.getChain(base_link, tool_link, robot_chain)) {
-    std::cout << "Failed to get KDL chain" << std::endl;
-    return -1;
+  // get the chain
+  if (!robot_tree.getChain(base_link, tool_link, robot_chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
   }
 
-  std::cout << "Successfully initialized robot urdf" << std::endl;
-  return 0;
+  std::cout << "Successfully initialized robot chain" << std::endl;
 }
 
-int Utils::init_q(KDL::Chain* robot_chain, KDL::JntArray& q,
-                  const std::vector<double>& initial_joint_angles, ENV env) {
-  if (env == ENV::SIM) {
-    // set the initial joint angles
-    q.resize(robot_chain->getNrOfJoints());
-    for (int i = 0; i < robot_chain->getNrOfJoints(); i++) {
-      q(i) = initial_joint_angles[i];
+// void computeForwardVelocityKinematics(std::string link_name, Kinova *rob, KDL::Chain
+// *robot_chain,
+//                                       double *out_twist)
+// {
+//   KDL::ChainFkSolverVel_recursive fk_solver(*robot_chain);
+
+//   KDL::JntArrayVel q_dot(rob->nj);
+
+//   for (size_t i = 0; i < rob->nj; i++)
+//   {
+//     q_dot.q(i) = rob->q[i];
+//     q_dot.qdot(i) = rob->q_dot[i];
+//   }
+
+//   int seg_nr = -1;
+//   getLinkIdFromChain(*robot_chain, link_name, seg_nr);
+
+//   KDL::FrameVel frame_vel;
+
+//   if (fk_solver.JntToCart(q_dot, frame_vel, seg_nr) < 0)
+//   {
+//     std::cerr << "Failed to compute forward velocity kinematics" << std::endl;
+//   }
+
+//   KDL::Twist twist = frame_vel.GetTwist();
+
+//   out_twist[0] = twist.vel.x();
+//   out_twist[1] = twist.vel.y();
+//   out_twist[2] = twist.vel.z();
+//   out_twist[3] = twist.rot.x();
+//   out_twist[4] = twist.rot.y();
+//   out_twist[5] = twist.rot.z();
+// }
+
+void computeForwardVelocityKinematics(std::string link_name, Kinova *rob, KDL::Chain *robot_chain,
+                                      double *out_twist)
+{
+  int seg_nr = -1;
+  getLinkIdFromChain(*robot_chain, link_name, seg_nr);
+
+  for (size_t i = 0; i < 6; i++)
+  {
+    out_twist[i] = rob->s_dot[seg_nr][i];
+  }
+}
+
+void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id)
+{
+  for (int i = 0; i < chain.getNrOfSegments(); i++)
+  {
+    if (chain.getSegment(i).getName() == link_name)
+    {
+      link_id = i;
+      return;
+    }
+  }
+}
+
+void add(double *arr1, double *arr2, double *result, size_t size)
+{
+  for (size_t i = 0; i < size; i++)
+  {
+    result[i] = arr1[i] + arr2[i];
+  }
+}
+
+void updateQandQdot(double *q_ddot, double dt, Kinova *rob)
+{
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    rob->q_ddot[i] = q_ddot[i];
+    rob->q_dot[i] += q_ddot[i] * dt;
+    rob->q[i] += rob->q_dot[i] * dt;
+  }
+}
+
+void achd_solver(Kinova *rob, KDL::Chain *chain, int num_constraints, double *root_acceleration,
+                 double **alpha, double *beta, double **ext_wrench, double *tau_ff,
+                 double *predicted_acc, double *constraint_tau)
+{
+  // root acceleration
+  KDL::Twist root_acc(
+      KDL::Vector(root_acceleration[0], root_acceleration[1], root_acceleration[2]),
+      KDL::Vector(root_acceleration[3], root_acceleration[4], root_acceleration[5]));
+
+  KDL::ChainHdSolver_Vereshchagin vereshchagin_solver(*chain, root_acc, num_constraints);
+
+  // alpha - constraint forces
+  KDL::Jacobian alpha_jac = KDL::Jacobian(num_constraints);
+
+  for (int i = 0; i < num_constraints; i++)
+  {
+    for (int j = 0; j < 6; j++)
+    {
+      alpha_jac(i, j) = alpha[i][j];
     }
   }
 
-  std::cout << "Successfully initialized joint angles" << std::endl;
-  return 0;
-}
+  // beta - accel energy
+  KDL::JntArray beta_jnt = KDL::JntArray(num_constraints);
 
-double Utils::computeEuclideanDistance(const std::array<double, 3>& current,
-                                       const std::array<double, 3>& target) {
-  double x_diff = target[0] - current[0];
-  double y_diff = target[1] - current[1];
-  double z_diff = target[2] - current[2];
+  for (int i = 0; i < num_constraints; i++)
+  {
+    beta_jnt(i) = beta[i];
+  }
 
-  return sqrt(pow(x_diff, 2) + pow(y_diff, 2) + pow(z_diff, 2));
-}
+  // q, qd, qdd
+  KDL::JntArray q = KDL::JntArray(rob->nj);
+  KDL::JntArray qd = KDL::JntArray(rob->nj);
 
-std::vector<double> Utils::calc_error(const std::array<double, 3>& p1,
-                                      const std::array<double, 3>& p2) {
-  double dx = p2[0] - p1[0];
-  double dy = p2[1] - p1[1];
-  double dz = p2[2] - p1[2];
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    q(i) = rob->q[i];
+    qd(i) = rob->q_dot[i];
+  }
 
-  return {dx, dy, dz};
-}
+  // ext wrench
+  KDL::Wrenches f_ext;
 
-KDL::Vector Utils::calc_error(const KDL::Vector& v1, const KDL::Vector& v2) {
-  return v2 - v1;
+  for (int i = 0; i < rob->ns; i++)
+  {
+    KDL::Wrench wrench;
+    for (int j = 0; j < 6; j++)
+    {
+      wrench(j) = ext_wrench[i][j];
+    }
+    f_ext.push_back(wrench);
+  }
+
+  // feedforward torques
+  KDL::JntArray ff_tau_jnt = KDL::JntArray(rob->nj);
+
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    ff_tau_jnt(i) = tau_ff[i];
+  }
+
+  // predicted accelerations
+  KDL::JntArray qdd = KDL::JntArray(rob->nj);
+
+  // constraint torques
+  KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob->nj);
+
+  int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext, ff_tau_jnt,
+                                        constraint_tau_jnt);
+
+  std::vector<KDL::Twist> twists(7);
+  vereshchagin_solver.getLinkCartesianVelocity(twists);
+
+  std::vector<KDL::Frame> frames(7);
+  vereshchagin_solver.getLinkCartesianPose(frames);
+
+  for (size_t j = 0; j < rob->ns; j++)
+  {
+    // update segment pose
+    // convert KDL::Frame to double[6] - [x, y, z, rx, ry, rz]
+    rob->s[j][0] = frames[j].p.x();
+    rob->s[j][1] = frames[j].p.y();
+    rob->s[j][2] = frames[j].p.z();
+    frames[j].M.GetRPY(rob->s[j][3], rob->s[j][4], rob->s[j][5]);
+
+    // update segment twist
+    for (size_t i = 0; i < 6; i++)
+    {
+      rob->s_dot[j][i] = twists[j](i);
+    }
+  }
+
+  if (r < 0)
+  {
+    std::cerr << "Failed to solve the hybrid dynamics problem" << std::endl;
+    std::cerr << "Error code: " << r << std::endl;
+  }
+
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    predicted_acc[i] = qdd(i);
+    constraint_tau[i] = constraint_tau_jnt(i);
+  }
 }

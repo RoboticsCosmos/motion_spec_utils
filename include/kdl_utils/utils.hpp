@@ -37,121 +37,101 @@
 #include "kdl/jacobian.hpp"
 #include "kdl/jntarray.hpp"
 #include "kdl/tree.hpp"
+#include "kdl/chainfksolverpos_recursive.hpp"
+#include "kdl/chainfksolvervel_recursive.hpp"
+#include "kdl/chainhdsolver_vereshchagin.hpp"
 #include "kdl_parser/kdl_parser.hpp"
 
-enum ENV { SIM, ROB };
 
-class Utils {
- public:
-  Utils();
-  ~Utils();
-
-  /**
-   * @brief Prints the names of all links in a KDL::Tree.
-   * @param tree The KDL::Tree object representing the robot's kinematic tree.
-   */
-  static void printLinkNames(KDL::Tree& tree);
-
-  /**
-   * @brief Get the names of all links in a KDL::Chain.
-   * @param chain The KDL::Chain object representing a subset of the robot's
-   * kinematic chain.
-   * @return A vector containing the names of all links in the chain.
-   */
-  static std::vector<std::string> getLinkNamesFromChain(KDL::Chain& chain);
-
-  /**
-   * @brief Get the id of a link in a KDL::Chain.
-   * @param chain The KDL::Chain object representing a subset of the robot's
-   * kinematic chain.
-   * @param link_name The name of the link.
-   * @return The id of the link.
-   */
-  static int getLinkIdFromChain(KDL::Chain& chain,
-                                const std::string& link_name);
-
-  /**
-   * @brief Check if the given link name is in the KDL::Chain.
-   * @param chain The KDL::Chain object representing a subset of the robot's
-   * kinematic chain.
-   */
-  static bool checkLinkInChain(KDL::Chain& chain, const std::string& link_name);
-
-  /**
-   * @brief Prints the names of all joints in a KDL::Chain.
-   * @param chain The KDL::Chain object representing a subset of the robot's
-   * kinematic chain.
-   */
-  static void printJointNames(KDL::Chain& chain);
-
-  /**
-   * @brief Prints the elements of a vector.
-   * @tparam T The type of the vector elements.
-   * @param vec The vector to be printed.
-   */
-  template <typename T>
-  static void printVec(const T& vec);
-
-  /**
-   * @brief Prints the elements of a KDL::JntArray.
-   * @tparam T The type of the KDL::JntArray.
-   * @param jntArr The KDL::JntArray to be printed.
-   */
-  template <typename T>
-  static void printJntArr(const T& jntArr);
-
-  /**
-   * @brief Initializes the robot using a URDF file and sets the initial joint
-   * angles.
-   * @param urdf_path The file path to the robot's URDF description.
-   * @param robot_chain [out] The KDL chain representing the robot.
-   * @param base_link The name of the robot's base link.
-   * @param tool_link The name of the robot's tool link.
-   * @return 0 on success, -1 on failure.
-   */
-  int initialize_robot_urdf(const std::string& urdf_path,
-                            KDL::Chain& robot_chain,
-                            const std::string& base_link,
-                            const std::string& tool_link);
-
-  /**
-   * @brief Initializes the q with the initial joint angles.
-   * @param initial_joint_angles A vector containing the initial joint angles.
-   * @param q [out] The KDL joint array representing the robot's joint angles.
-   * @param env a ENV enum value representing the environment the robot is in.
-   * @return 0 on success, -1 on failure.
-   */
-  int init_q(
-      KDL::Chain* robot_chain, KDL::JntArray& q,
-      const std::vector<double>& initial_joint_angles = std::vector<double>(),
-      ENV env = ENV::SIM);
-
-  /**
-   * @brief Computes the euclidean distance between two 3d points.
-   * @param p1 The first point of type std::array<double, 3>.
-   * @param p2 The second point of type std::array<double, 3>.
-   * @return The euclidean distance between the two points.
-   */
-  static double computeEuclideanDistance(const std::array<double, 3>& current,
-                                         const std::array<double, 3>& target);
-
-  /**
-   * @brief Calculates the error between two points.
-   *
-   * @param p1 The first point (x1, y1, z1).
-   * @param p2 The second point (x2, y2, z2).
-   * @return The error as a tuple (dx, dy, dz).
-   */
-  std::vector<double> calc_error(const std::array<double, 3>& p1,
-                                 const std::array<double, 3>& p2);
-
-  /**
-   * @brief Calculates the error between two kdl vectors.
-   * @param v1 The first vector.
-   * @param v2 The second vector.
-   * @return The error as a kdl vector.
-   */
-  KDL::Vector calc_error(const KDL::Vector& v1, const KDL::Vector& v2);
+struct Kinova {
+  int nj;
+  int ns;
+  double* q;
+  double* q_dot;
+  double* q_ddot;
+  double** s;
+  double** s_dot;
+  double** s_ddot;
 };
+//{ 0.0, 0.26, 0.0, 2.26, 0.0, -0.95, -1.57 }
+
+/**
+ * @brief Initializes the robot state struct.
+ * @param num_joints The number of joints.
+ * @param num_segments The number of segments.
+ * @param rob [out] The robot state struct.
+ */
+void initialize_robot_state(int num_joints, int num_segments, Kinova* rob);
+
+/**
+ * @brief Initializes the robot state struct.
+ * @param num_joints The number of joints.
+ * @param num_segments The number of segments.
+ * @param init_q The initial joint positions.
+ * @param rob [out] The robot state struct.
+ */
+void initialize_robot_state(int num_joints, int num_segments, double* init_q, Kinova* rob);
+
+/**
+ * @brief Initializes the robot chain.
+ * @param robot_urdf The path to the robot urdf.
+ * @param base_link The name of the base link.
+ * @param tool_link The name of the tool link.
+ * @param robot_chain [out] The KDL chain representing the robot.
+ */
+void initialize_robot_chain(std::string robot_urdf,
+                            std::string base_link,
+                            std::string tool_link,
+                            KDL::Chain& robot_chain);
+
+/**
+ * @brief Computes forward velocity kinematics.
+ * @param link_name The name of the link.
+ * @param rob Robot state struct.
+ * @param robot_chain The KDL chain representing the robot.
+ * @param out_twist [out] The twist of the link std::array<double, 6>.
+ */
+void computeForwardVelocityKinematics(std::string link_name,
+                                      Kinova* rob,
+                                      KDL::Chain* robot_chain,
+                                      double *out_twist);
+               
+/**
+ * @brief Adds two arrays.
+ * @param arr1 The first array.
+ * @param arr2 The second array.
+ * @param result [out] The result of the addition.
+ * @param size The size of the arrays.
+ */
+extern void add(double* arr1, double* arr2, double* result, size_t size);
+
+/**
+ * @brief Updates the q and q_dot values of the robot state struct.
+ * @param q_ddot The joint accelerations.
+ * @param dt The time step.
+ * @param rob [in/out] The robot state struct.
+ */
+void updateQandQdot(double *q_ddot, double dt, Kinova* rob);
+
+/**
+ * @brief Solves the hybrid dynamics problem for a given robot chain.
+ * @param rob The robot state struct.
+ * @param robot_chain The KDL::Chain object representing the robot's kinematic chain.
+ * @param num_constraints The number of constraints.
+ * @param root_acceleration The root acceleration.
+ * @param alpha The alpha matrix.
+ * @param beta The beta vector.
+ * @param ext_wrench The external wrenches.
+ * @param tau_ff The feedforward torques.
+ * @param predicted_acc [out] The output predicted joint accelerations.
+ * @param constraint_tau [out] The output constraint torques.
+ */
+void achd_solver(Kinova *rob, KDL::Chain *chain, int num_constraints, 
+                  double *root_acceleration,
+                 double **alpha, double *beta,
+                 double **ext_wrench, double *tau_ff,
+                 double *predicted_acc, double *constraint_tau);
+
+void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id);
 
 #endif  // UTILS_HPP
