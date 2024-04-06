@@ -40,3 +40,8 @@ void compare(double measured, double setpoint, double threshold, std::string com
 
   result = op(measured + threshold, setpoint);
 }
+
+void compareEqual(double measured, double setpoint, bool &result)
+{
+  compare(measured, setpoint, eq_tol, "eq", result);
+}

@@ -53,7 +53,6 @@ struct Kinova {
   double** s_dot;
   double** s_ddot;
 };
-//{ 0.0, 0.26, 0.0, 2.26, 0.0, -0.95, -1.57 }
 
 /**
  * @brief Initializes the robot state struct.
@@ -87,14 +86,20 @@ void initialize_robot_chain(std::string robot_urdf,
 /**
  * @brief Computes forward velocity kinematics.
  * @param link_name The name of the link.
+ * @param as_seen_by The name of the link from which the twist is computed.
+ * @param with_respect_to The name of the link with respect to which the twist is computed.
+ * @param vec The direction vector.
  * @param rob Robot state struct.
  * @param robot_chain The KDL chain representing the robot.
- * @param out_twist [out] The twist of the link std::array<double, 6>.
+ * @param out_twist [out] The twist of the link.
  */
 void computeForwardVelocityKinematics(std::string link_name,
+                                      std::string as_seen_by,
+                                      std::string with_respect_to,
+                                      double *vec,
                                       Kinova* rob,
                                       KDL::Chain* robot_chain,
-                                      double *out_twist);
+                                      double out_twist);
                
 /**
  * @brief Adds two arrays.

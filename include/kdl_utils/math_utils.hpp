@@ -100,4 +100,12 @@ const std::map<std::string, std::function<bool(double, double)>> comp_op_map = {
 void compare(double measured, double setpoint, double threshold, std::string comp_op,
              bool &result);
 
+/**
+ * @brief Compares the equality of two doubles.
+ * @param measured The measured value.
+ * @param setpoint The setpoint value.
+ * @param result [out] The result of the comparison.
+ */
+void compareEqual(double measured, double setpoint, bool &result);
+
 #endif  // MATH_UTILS_HPP

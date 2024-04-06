@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.15.0)
 project(kdl_utils VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -6,13 +6,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_INSTALL_DIR share/${PROJECT_NAME}/cmake)
 
 # add path to CMAKE_PREFIX_PATH
-# list(APPEND CMAKE_PREFIX_PATH /home/batsy/rc/build/)
+list(APPEND CMAKE_PREFIX_PATH /home/batsy/rc/build/)
 list(APPEND CMAKE_MODULE_PATH /home/batsy/rc/build/)
 
 find_package(Eigen3 REQUIRED)
 find_package(kdl_parser REQUIRED)
 find_package(orocos_kdl REQUIRED)
-
 
 # append orocos include dirs
 list(APPEND orocos_kdl_INCLUDE_DIRS /home/batsy/rc/install/include/)

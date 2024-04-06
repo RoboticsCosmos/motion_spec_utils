@@ -130,15 +130,30 @@ void initialize_robot_chain(std::string robot_urdf, std::string base_link, std::
 //   out_twist[5] = twist.rot.z();
 // }
 
-void computeForwardVelocityKinematics(std::string link_name, Kinova *rob, KDL::Chain *robot_chain,
-                                      double *out_twist)
+void computeForwardVelocityKinematics(std::string link_name,
+                                      std::string as_seen_by,
+                                      std::string with_respect_to,
+                                      double *vec,
+                                      Kinova* rob,
+                                      KDL::Chain* robot_chain,
+                                      double out_twist)
 {
   int seg_nr = -1;
   getLinkIdFromChain(*robot_chain, link_name, seg_nr);
 
+  int as_seen_by_id = -1;
+  getLinkIdFromChain(*robot_chain, as_seen_by, as_seen_by_id);
+
+  int with_respect_to_id = -1;
+  getLinkIdFromChain(*robot_chain, with_respect_to, with_respect_to_id);
+
   for (size_t i = 0; i < 6; i++)
   {
-    out_twist[i] = rob->s_dot[seg_nr][i];
+    if (vec[i] != 0)
+    {
+      out_twist = rob->s_dot[seg_nr][i];
+      break;
+    }
   }
 }
 
