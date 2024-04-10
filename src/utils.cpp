@@ -26,9 +26,6 @@
 
 #include "kdl_utils/utils.hpp"
 
-#include "kdl/chainhdsolver_vereshchagin.hpp"
-#include "kdl/kinfam_io.hpp"
-
 void initialize_robot_state(int num_joints, int num_segments, Kinova *rob)
 {
   rob->nj = num_joints;
@@ -187,6 +184,148 @@ void updateQandQdot(double *q_ddot, double dt, Kinova *rob)
   }
 }
 
+void rne_solver(Kinova *rob, KDL::Chain *chain, double *root_acceleration,
+                 double **ext_wrench, double *constraint_tau)
+{
+  // root acceleration
+  KDL::Twist root_acc(
+      KDL::Vector(0.0, 0.0, 0.0),
+      KDL::Vector(0.0, 0.0, 0.0));
+
+  KDL::ChainIdSolver_RNE rne(*chain, KDL::Vector(0, 0, 0));
+
+  // q, qd, qdd
+  KDL::JntArray q = KDL::JntArray(rob->nj);
+  KDL::JntArray qd = KDL::JntArray(rob->nj);
+
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    q(i) = rob->q[i];
+    qd(i) = rob->q_dot[i];
+  }
+
+  // ext wrench
+  KDL::Wrenches f_ext;
+
+  for (int i = 0; i < rob->ns; i++)
+  {
+    KDL::Wrench wrench;
+    for (int j = 0; j < 6; j++)
+    {
+      wrench(j) = ext_wrench[i][j];
+    }
+    f_ext.push_back(wrench);
+  }
+
+
+  // predicted accelerations
+  KDL::JntArray qdd = KDL::JntArray(rob->nj);
+
+  // constraint torques
+  KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob->nj);
+
+  int r = rne.CartToJnt(q, qd, qdd, f_ext, constraint_tau_jnt);
+
+  std::cout << "[rne] tau: " << constraint_tau_jnt << std::endl;
+
+  if (r < 0)
+  {
+    std::cerr << "Failed to solve the hybrid dynamics problem" << std::endl;
+    std::cerr << "Error code: " << r << std::endl;
+  }
+
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    constraint_tau[i] = constraint_tau_jnt(i);
+  }
+}
+
+void achd_solver_fext(Kinova *rob, KDL::Chain *chain, double **ext_wrench, double *constraint_tau)
+{
+  // root acceleration
+  KDL::Twist root_acc(
+      KDL::Vector(0.0, 0.0, 0.0),
+      KDL::Vector(0.0, 0.0, 0.0));
+
+  int num_constraints = 6;
+
+  KDL::ChainHdSolver_Vereshchagin_Fext vereshchagin_solver_fext(*chain, root_acc, num_constraints);
+
+  // alpha - constraint forces
+  KDL::Jacobian alpha_jac = KDL::Jacobian(num_constraints);
+
+  // beta - accel energy
+  KDL::JntArray beta_jnt = KDL::JntArray(num_constraints);
+
+  // q, qd, qdd
+  KDL::JntArray q = KDL::JntArray(rob->nj);
+  KDL::JntArray qd = KDL::JntArray(rob->nj);
+
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    q(i) = rob->q[i];
+    qd(i) = rob->q_dot[i];
+  }
+
+  // ext wrench
+  KDL::Wrenches f_ext;
+
+  for (int i = 0; i < rob->ns; i++)
+  {
+    KDL::Wrench wrench;
+    for (int j = 0; j < 6; j++)
+    {
+      wrench(j) = ext_wrench[i][j];
+    }
+    f_ext.push_back(wrench);
+  }
+
+  // feedforward torques
+  KDL::JntArray ff_tau_jnt = KDL::JntArray(rob->nj);
+
+  // predicted accelerations
+  KDL::JntArray qdd = KDL::JntArray(rob->nj);
+
+  // constraint torques
+  KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob->nj);
+
+  int r = vereshchagin_solver_fext.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext, ff_tau_jnt,
+                                        constraint_tau_jnt);
+
+  if (r < 0)
+  {
+    std::cerr << "Failed to solve the hybrid dynamics problem" << std::endl;
+    std::cerr << "Error code: " << r << std::endl;
+  }
+
+  std::vector<KDL::Twist> twists(7);
+  vereshchagin_solver_fext.getLinkCartesianVelocity(twists);
+
+  std::vector<KDL::Frame> frames(7);
+  vereshchagin_solver_fext.getLinkCartesianPose(frames);
+
+  for (size_t j = 0; j < rob->ns; j++)
+  {
+    // update segment pose
+    // convert KDL::Frame to double[6] - [x, y, z, rx, ry, rz]
+    rob->s[j][0] = frames[j].p.x();
+    rob->s[j][1] = frames[j].p.y();
+    rob->s[j][2] = frames[j].p.z();
+    frames[j].M.GetRPY(rob->s[j][3], rob->s[j][4], rob->s[j][5]);
+
+    // update segment twist
+    for (size_t i = 0; i < 6; i++)
+    {
+      rob->s_dot[j][i] = twists[j](i);
+    }
+  }
+
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    constraint_tau[i] = constraint_tau_jnt(i);
+  }
+}
+
 void achd_solver(Kinova *rob, KDL::Chain *chain, int num_constraints, double *root_acceleration,
                  double **alpha, double *beta, double **ext_wrench, double *tau_ff,
                  double *predicted_acc, double *constraint_tau)
@@ -257,6 +396,12 @@ void achd_solver(Kinova *rob, KDL::Chain *chain, int num_constraints, double *ro
   int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext, ff_tau_jnt,
                                         constraint_tau_jnt);
 
+  if (r < 0)
+  {
+    std::cerr << "Failed to solve the hybrid dynamics problem" << std::endl;
+    std::cerr << "Error code: " << r << std::endl;
+  }
+  
   std::vector<KDL::Twist> twists(7);
   vereshchagin_solver.getLinkCartesianVelocity(twists);
 
@@ -277,12 +422,6 @@ void achd_solver(Kinova *rob, KDL::Chain *chain, int num_constraints, double *ro
     {
       rob->s_dot[j][i] = twists[j](i);
     }
-  }
-
-  if (r < 0)
-  {
-    std::cerr << "Failed to solve the hybrid dynamics problem" << std::endl;
-    std::cerr << "Error code: " << r << std::endl;
   }
 
   for (size_t i = 0; i < rob->nj; i++)

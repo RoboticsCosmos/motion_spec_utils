@@ -40,7 +40,10 @@
 #include "kdl/chainfksolverpos_recursive.hpp"
 #include "kdl/chainfksolvervel_recursive.hpp"
 #include "kdl/chainhdsolver_vereshchagin.hpp"
+#include "kdl/chainhdsolver_vereshchagin_fext.hpp"
+#include "kdl/chainidsolver_recursive_newton_euler.hpp"
 #include "kdl_parser/kdl_parser.hpp"
+#include "kdl/kinfam_io.hpp"
 
 
 struct Kinova {
@@ -136,6 +139,11 @@ void achd_solver(Kinova *rob, KDL::Chain *chain, int num_constraints,
                  double **alpha, double *beta,
                  double **ext_wrench, double *tau_ff,
                  double *predicted_acc, double *constraint_tau);
+
+void achd_solver_fext(Kinova *rob, KDL::Chain *chain, double **ext_wrench, double *constraint_tau);
+
+void rne_solver(Kinova *rob, KDL::Chain *chain, double *root_acceleration,
+                 double **ext_wrench, double *constraint_tau);
 
 void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id);
 
