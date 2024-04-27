@@ -24,7 +24,7 @@
  * SOFTWARE.
  */
 
-#include "kdl_utils/solver_utils.hpp"
+#include "motion_spec_utils/solver_utils.hpp"
 
 // void achd_solver(Kinova *rob, KDL::Chain *chain, int num_constraints, 
 //                   double *root_acceleration,

@@ -24,7 +24,7 @@
  * SOFTWARE.
  */
 
-#include "kdl_utils/utils_old.hpp"
+#include "motion_spec_utils/utils_old.hpp"
 
 Utils::Utils() {}
 

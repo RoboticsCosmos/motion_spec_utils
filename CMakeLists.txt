@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15.0)
-project(kdl_utils VERSION 0.1.0 LANGUAGES C CXX)
+project(motion_spec_utils VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -14,14 +14,13 @@ find_package(kdl_parser REQUIRED)
 find_package(orocos_kdl REQUIRED)
 
 # append orocos include dirs
-list(APPEND orocos_kdl_INCLUDE_DIRS /home/batsy/rc/install/include/)
-message(STATUS "orocos_kdl_INCLUDE_DIRS: ${orocos_kdl_INCLUDE_DIRS}")
+list(APPEND local_INCLUDE_DIRS ${CMAKE_INSTALL_PREFIX}/include/)
 
 # includes
 include_directories(
   include
   ${EIGEN3_INCLUDE_DIRS}
-  ${orocos_kdl_INCLUDE_DIRS}
+  ${local_INCLUDE_DIRS}
 )
 
 # add library

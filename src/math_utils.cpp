@@ -24,7 +24,7 @@
  * SOFTWARE.
  */
 
-#include "kdl_utils/math_utils.hpp"
+#include "motion_spec_utils/math_utils.hpp"
 
 void compare(double measured, double setpoint, double threshold, std::string comp_op, bool &result)
 {

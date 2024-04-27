@@ -24,7 +24,7 @@
  * SOFTWARE.
  */
 
-#include "kdl_utils/solver_utils_old.hpp"
+#include "motion_spec_utils/solver_utils_old.hpp"
 
 SolverUtils::SolverUtils() {}
 

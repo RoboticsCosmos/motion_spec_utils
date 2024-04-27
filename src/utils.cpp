@@ -24,7 +24,7 @@
  * SOFTWARE.
  */
 
-#include "kdl_utils/utils.hpp"
+#include "motion_spec_utils/utils.hpp"
 
 void initialize_robot_state(int num_joints, int num_segments, Kinova *rob)
 {

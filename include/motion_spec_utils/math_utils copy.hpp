@@ -35,7 +35,7 @@
 
 #include "kdl/frames.hpp"
 
-#include "kdl_utils/fixed_size_queue.hpp"
+#include "motion_spec_utils/fixed_size_queue.hpp"
 
 class MathUtils
 {

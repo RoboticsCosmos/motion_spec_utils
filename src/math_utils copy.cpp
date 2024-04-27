@@ -24,7 +24,7 @@
  * SOFTWARE.
  */
 
-#include "kdl_utils/math_utils copy.hpp"
+#include "motion_spec_utils/math_utils copy.hpp"
 
 MathUtils::MathUtils(double eq_tol) : _eq_tol(eq_tol){};
 
