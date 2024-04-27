@@ -26,7 +26,7 @@
 
 #include "motion_spec_utils/utils.hpp"
 
-void initialize_robot_state(int num_joints, int num_segments, Kinova *rob)
+void initialize_robot_state(int num_joints, int num_segments, Manipulator *rob)
 {
   rob->nj = num_joints;
   rob->ns = num_segments;
@@ -47,7 +47,7 @@ void initialize_robot_state(int num_joints, int num_segments, Kinova *rob)
   }
 }
 
-void initialize_robot_state(int num_joints, int num_segments, double *init_q, Kinova *rob)
+void initialize_robot_state(int num_joints, int num_segments, double *init_q, Manipulator *rob)
 {
   rob->nj = num_joints;
   rob->ns = num_segments;
@@ -127,13 +127,9 @@ void initialize_robot_chain(std::string robot_urdf, std::string base_link, std::
 //   out_twist[5] = twist.rot.z();
 // }
 
-void computeForwardVelocityKinematics(std::string link_name,
-                                      std::string as_seen_by,
-                                      std::string with_respect_to,
-                                      double *vec,
-                                      Kinova* rob,
-                                      KDL::Chain* robot_chain,
-                                      double out_twist)
+void computeForwardVelocityKinematics(std::string link_name, std::string as_seen_by,
+                                      std::string with_respect_to, double *vec, Manipulator *rob,
+                                      KDL::Chain *robot_chain, double out_twist)
 {
   int seg_nr = -1;
   getLinkIdFromChain(*robot_chain, link_name, seg_nr);
@@ -174,7 +170,7 @@ void add(double *arr1, double *arr2, double *result, size_t size)
   }
 }
 
-void updateQandQdot(double *q_ddot, double dt, Kinova *rob)
+void updateQandQdot(double *q_ddot, double dt, Manipulator *rob)
 {
   for (size_t i = 0; i < rob->nj; i++)
   {
@@ -184,13 +180,11 @@ void updateQandQdot(double *q_ddot, double dt, Kinova *rob)
   }
 }
 
-void rne_solver(Kinova *rob, KDL::Chain *chain, double *root_acceleration,
-                 double **ext_wrench, double *constraint_tau)
+void rne_solver(Manipulator *rob, KDL::Chain *chain, double *root_acceleration,
+                double **ext_wrench, double *constraint_tau)
 {
   // root acceleration
-  KDL::Twist root_acc(
-      KDL::Vector(0.0, 0.0, 0.0),
-      KDL::Vector(0.0, 0.0, 0.0));
+  KDL::Twist root_acc(KDL::Vector(0.0, 0.0, 0.0), KDL::Vector(0.0, 0.0, 0.0));
 
   KDL::ChainIdSolver_RNE rne(*chain, KDL::Vector(0, 0, 0));
 
@@ -217,7 +211,6 @@ void rne_solver(Kinova *rob, KDL::Chain *chain, double *root_acceleration,
     f_ext.push_back(wrench);
   }
 
-
   // predicted accelerations
   KDL::JntArray qdd = KDL::JntArray(rob->nj);
 
@@ -240,12 +233,11 @@ void rne_solver(Kinova *rob, KDL::Chain *chain, double *root_acceleration,
   }
 }
 
-void achd_solver_fext(Kinova *rob, KDL::Chain *chain, double **ext_wrench, double *constraint_tau)
+void achd_solver_fext(Manipulator *rob, KDL::Chain *chain, double **ext_wrench,
+                      double *constraint_tau)
 {
   // root acceleration
-  KDL::Twist root_acc(
-      KDL::Vector(0.0, 0.0, 0.0),
-      KDL::Vector(0.0, 0.0, 0.0));
+  KDL::Twist root_acc(KDL::Vector(0.0, 0.0, 0.0), KDL::Vector(0.0, 0.0, 0.0));
 
   int num_constraints = 6;
 
@@ -290,7 +282,7 @@ void achd_solver_fext(Kinova *rob, KDL::Chain *chain, double **ext_wrench, doubl
   KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob->nj);
 
   int r = vereshchagin_solver_fext.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext, ff_tau_jnt,
-                                        constraint_tau_jnt);
+                                             constraint_tau_jnt);
 
   if (r < 0)
   {
@@ -326,9 +318,9 @@ void achd_solver_fext(Kinova *rob, KDL::Chain *chain, double **ext_wrench, doubl
   }
 }
 
-void achd_solver(Kinova *rob, KDL::Chain *chain, int num_constraints, double *root_acceleration,
-                 double **alpha, double *beta, double **ext_wrench, double *tau_ff,
-                 double *predicted_acc, double *constraint_tau)
+void achd_solver(Manipulator *rob, KDL::Chain *chain, int num_constraints,
+                 double *root_acceleration, double **alpha, double *beta, double **ext_wrench,
+                 double *tau_ff, double *predicted_acc, double *constraint_tau)
 {
   // root acceleration
   KDL::Twist root_acc(
@@ -401,7 +393,7 @@ void achd_solver(Kinova *rob, KDL::Chain *chain, int num_constraints, double *ro
     std::cerr << "Failed to solve the hybrid dynamics problem" << std::endl;
     std::cerr << "Error code: " << r << std::endl;
   }
-  
+
   std::vector<KDL::Twist> twists(7);
   vereshchagin_solver.getLinkCartesianVelocity(twists);
 

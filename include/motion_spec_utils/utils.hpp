@@ -33,29 +33,18 @@
 #include <vector>
 
 #include "kdl/chain.hpp"
-#include "kdl/frames.hpp"
-#include "kdl/jacobian.hpp"
-#include "kdl/jntarray.hpp"
-#include "kdl/tree.hpp"
 #include "kdl/chainfksolverpos_recursive.hpp"
 #include "kdl/chainfksolvervel_recursive.hpp"
 #include "kdl/chainhdsolver_vereshchagin.hpp"
 #include "kdl/chainhdsolver_vereshchagin_fext.hpp"
 #include "kdl/chainidsolver_recursive_newton_euler.hpp"
-#include "kdl_parser/kdl_parser.hpp"
+#include "kdl/frames.hpp"
+#include "kdl/jacobian.hpp"
+#include "kdl/jntarray.hpp"
 #include "kdl/kinfam_io.hpp"
-
-
-struct Kinova {
-  int nj;
-  int ns;
-  double* q;
-  double* q_dot;
-  double* q_ddot;
-  double** s;
-  double** s_dot;
-  double** s_ddot;
-};
+#include "kdl/tree.hpp"
+#include "kdl_parser/kdl_parser.hpp"
+#include "motion_spec_utils/robot_structs.hpp"
 
 /**
  * @brief Initializes the robot state struct.
@@ -63,7 +52,7 @@ struct Kinova {
  * @param num_segments The number of segments.
  * @param rob [out] The robot state struct.
  */
-void initialize_robot_state(int num_joints, int num_segments, Kinova* rob);
+void initialize_robot_state(int num_joints, int num_segments, Manipulator *rob);
 
 /**
  * @brief Initializes the robot state struct.
@@ -72,7 +61,7 @@ void initialize_robot_state(int num_joints, int num_segments, Kinova* rob);
  * @param init_q The initial joint positions.
  * @param rob [out] The robot state struct.
  */
-void initialize_robot_state(int num_joints, int num_segments, double* init_q, Kinova* rob);
+void initialize_robot_state(int num_joints, int num_segments, double *init_q, Manipulator *rob);
 
 /**
  * @brief Initializes the robot chain.
@@ -81,10 +70,8 @@ void initialize_robot_state(int num_joints, int num_segments, double* init_q, Ki
  * @param tool_link The name of the tool link.
  * @param robot_chain [out] The KDL chain representing the robot.
  */
-void initialize_robot_chain(std::string robot_urdf,
-                            std::string base_link,
-                            std::string tool_link,
-                            KDL::Chain& robot_chain);
+void initialize_robot_chain(std::string robot_urdf, std::string base_link, std::string tool_link,
+                            KDL::Chain &robot_chain);
 
 /**
  * @brief Computes forward velocity kinematics.
@@ -96,14 +83,10 @@ void initialize_robot_chain(std::string robot_urdf,
  * @param robot_chain The KDL chain representing the robot.
  * @param out_twist [out] The twist of the link.
  */
-void computeForwardVelocityKinematics(std::string link_name,
-                                      std::string as_seen_by,
-                                      std::string with_respect_to,
-                                      double *vec,
-                                      Kinova* rob,
-                                      KDL::Chain* robot_chain,
-                                      double out_twist);
-               
+void computeForwardVelocityKinematics(std::string link_name, std::string as_seen_by,
+                                      std::string with_respect_to, double *vec, Manipulator *rob,
+                                      KDL::Chain *robot_chain, double out_twist);
+
 /**
  * @brief Adds two arrays.
  * @param arr1 The first array.
@@ -111,7 +94,7 @@ void computeForwardVelocityKinematics(std::string link_name,
  * @param result [out] The result of the addition.
  * @param size The size of the arrays.
  */
-extern void add(double* arr1, double* arr2, double* result, size_t size);
+extern void add(double *arr1, double *arr2, double *result, size_t size);
 
 /**
  * @brief Updates the q and q_dot values of the robot state struct.
@@ -119,7 +102,7 @@ extern void add(double* arr1, double* arr2, double* result, size_t size);
  * @param dt The time step.
  * @param rob [in/out] The robot state struct.
  */
-void updateQandQdot(double *q_ddot, double dt, Kinova* rob);
+void updateQandQdot(double *q_ddot, double dt, Manipulator *rob);
 
 /**
  * @brief Solves the hybrid dynamics problem for a given robot chain.
@@ -134,16 +117,15 @@ void updateQandQdot(double *q_ddot, double dt, Kinova* rob);
  * @param predicted_acc [out] The output predicted joint accelerations.
  * @param constraint_tau [out] The output constraint torques.
  */
-void achd_solver(Kinova *rob, KDL::Chain *chain, int num_constraints, 
-                  double *root_acceleration,
-                 double **alpha, double *beta,
-                 double **ext_wrench, double *tau_ff,
-                 double *predicted_acc, double *constraint_tau);
+void achd_solver(Manipulator *rob, KDL::Chain *chain, int num_constraints,
+                 double *root_acceleration, double **alpha, double *beta, double **ext_wrench,
+                 double *tau_ff, double *predicted_acc, double *constraint_tau);
 
-void achd_solver_fext(Kinova *rob, KDL::Chain *chain, double **ext_wrench, double *constraint_tau);
+void achd_solver_fext(Manipulator *rob, KDL::Chain *chain, double **ext_wrench,
+                      double *constraint_tau);
 
-void rne_solver(Kinova *rob, KDL::Chain *chain, double *root_acceleration,
-                 double **ext_wrench, double *constraint_tau);
+void rne_solver(Manipulator *rob, KDL::Chain *chain, double *root_acceleration,
+                double **ext_wrench, double *constraint_tau);
 
 void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id);
 
