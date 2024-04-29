@@ -26,7 +26,7 @@
 
 #include "motion_spec_utils/utils.hpp"
 
-void initialize_robot_state(int num_joints, int num_segments, Manipulator *rob)
+void initialize_manipulator_state(int num_joints, int num_segments, Manipulator *rob)
 {
   rob->nj = num_joints;
   rob->ns = num_segments;
@@ -45,6 +45,16 @@ void initialize_robot_state(int num_joints, int num_segments, Manipulator *rob)
     rob->s_dot[i] = new double[6]{};
     rob->s_ddot[i] = new double[6]{};
   }
+
+  rob->tau_command = new double[num_joints]{};
+  rob->tau_measured = new double[num_joints]{};
+  rob->f_tool_measured = new double[6]{};
+}
+
+void initialize_mobile_base_state(MobileBase *base)
+{
+  base->pivot_angles = new double[3]{};
+  base->tau_command = new double[3]{};
 }
 
 void initialize_robot_state(int num_joints, int num_segments, double *init_q, Manipulator *rob)
@@ -71,6 +81,10 @@ void initialize_robot_state(int num_joints, int num_segments, double *init_q, Ma
   {
     rob->q[i] = init_q[i];
   }
+
+  rob->tau_command = new double[num_joints]{};
+  rob->tau_measured = new double[num_joints]{};
+  rob->f_tool_measured = new double[6]{};
 }
 
 void initialize_robot_chain(std::string robot_urdf, std::string base_link, std::string tool_link,
@@ -420,5 +434,27 @@ void achd_solver(Manipulator *rob, KDL::Chain *chain, int num_constraints,
   {
     predicted_acc[i] = qdd(i);
     constraint_tau[i] = constraint_tau_jnt(i);
+  }
+}
+
+void get_manipulator_data(Manipulator *rob, kinova_mediator *mediator)
+{
+  KDL::JntArray q(rob->nj);
+  KDL::JntArray q_dot(rob->nj);
+  KDL::JntArray tau_measured(rob->nj);
+  KDL::Wrench f_tool_measured;
+
+  mediator->get_robot_state(q, q_dot, tau_measured, f_tool_measured);
+
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    rob->q[i] = q(i);
+    rob->q_dot[i] = q_dot(i);
+    rob->tau_measured[i] = tau_measured(i);
+  }
+
+  for (size_t i = 0; i < 6; i++)
+  {
+    rob->f_tool_measured[i] = f_tool_measured(i);
   }
 }

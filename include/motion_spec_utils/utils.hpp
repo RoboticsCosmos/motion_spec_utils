@@ -46,13 +46,18 @@
 #include "kdl_parser/kdl_parser.hpp"
 #include "motion_spec_utils/robot_structs.hpp"
 
+#include "kelo_motion_control/mediator.h"
+#include "kinova_mediator/mediator.hpp"
+
 /**
  * @brief Initializes the robot state struct.
  * @param num_joints The number of joints.
  * @param num_segments The number of segments.
  * @param rob [out] The robot state struct.
  */
-void initialize_robot_state(int num_joints, int num_segments, Manipulator *rob);
+void initialize_manipulator_state(int num_joints, int num_segments, Manipulator *rob);
+
+void initialize_mobile_base_state(MobileBase *base);
 
 /**
  * @brief Initializes the robot state struct.
@@ -128,5 +133,7 @@ void rne_solver(Manipulator *rob, KDL::Chain *chain, double *root_acceleration,
                 double **ext_wrench, double *constraint_tau);
 
 void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id);
+
+void get_manipulator_data(Manipulator *rob, kinova_mediator *mediator);
 
 #endif  // UTILS_HPP

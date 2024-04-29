@@ -12,12 +12,13 @@ struct Manipulator
   double **s_dot;
   double **s_ddot;
   double *tau_command;
+  double *tau_measured;
+  double *f_tool_measured;
 };
 
 struct MobileBase
 {
-  int ndrives;
-  double *wheel_diameter;
+  double *pivot_angles;
   double *tau_command;
 };
 
