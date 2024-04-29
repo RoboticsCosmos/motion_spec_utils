@@ -290,10 +290,10 @@ void achd_solver_fext(Manipulator *rob, KDL::Chain *chain, double **ext_wrench,
     std::cerr << "Error code: " << r << std::endl;
   }
 
-  std::vector<KDL::Twist> twists(7);
+  std::vector<KDL::Twist> twists(rob->ns);
   vereshchagin_solver_fext.getLinkCartesianVelocity(twists);
 
-  std::vector<KDL::Frame> frames(7);
+  std::vector<KDL::Frame> frames(rob->ns);
   vereshchagin_solver_fext.getLinkCartesianPose(frames);
 
   for (size_t j = 0; j < rob->ns; j++)
@@ -394,10 +394,10 @@ void achd_solver(Manipulator *rob, KDL::Chain *chain, int num_constraints,
     std::cerr << "Error code: " << r << std::endl;
   }
 
-  std::vector<KDL::Twist> twists(7);
+  std::vector<KDL::Twist> twists(rob->ns);
   vereshchagin_solver.getLinkCartesianVelocity(twists);
 
-  std::vector<KDL::Frame> frames(7);
+  std::vector<KDL::Frame> frames(rob->ns);
   vereshchagin_solver.getLinkCartesianPose(frames);
 
   for (size_t j = 0; j < rob->ns; j++)
