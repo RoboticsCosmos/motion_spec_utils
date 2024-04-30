@@ -48,6 +48,7 @@ void initialize_manipulator_state(int num_joints, int num_segments, Manipulator 
 
   rob->tau_command = new double[num_joints]{};
   rob->tau_measured = new double[num_joints]{};
+  rob->f_tool_command = new double[6]{};
   rob->f_tool_measured = new double[6]{};
 }
 
@@ -57,7 +58,8 @@ void initialize_mobile_base_state(MobileBase *base)
   base->tau_command = new double[3]{};
 }
 
-void initialize_robot_state(int num_joints, int num_segments, double *init_q, Manipulator *rob)
+void initialize_robot_state(int num_joints, int num_segments, double *init_q,
+                            Manipulator *rob)
 {
   rob->nj = num_joints;
   rob->ns = num_segments;
@@ -87,8 +89,8 @@ void initialize_robot_state(int num_joints, int num_segments, double *init_q, Ma
   rob->f_tool_measured = new double[6]{};
 }
 
-void initialize_robot_chain(std::string robot_urdf, std::string base_link, std::string tool_link,
-                            KDL::Chain &robot_chain)
+void initialize_robot_chain(std::string robot_urdf, std::string base_link,
+                            std::string tool_link, KDL::Chain &robot_chain)
 {
   KDL::Tree robot_tree;
 
@@ -232,7 +234,8 @@ void achd_solver_fext(Manipulator *rob, KDL::Chain *chain, double **ext_wrench,
 
   int num_constraints = 6;
 
-  KDL::ChainHdSolver_Vereshchagin_Fext vereshchagin_solver_fext(*chain, root_acc, num_constraints);
+  KDL::ChainHdSolver_Vereshchagin_Fext vereshchagin_solver_fext(*chain, root_acc,
+                                                                num_constraints);
 
   // alpha - constraint forces
   KDL::Jacobian alpha_jac = KDL::Jacobian(num_constraints);
@@ -272,8 +275,8 @@ void achd_solver_fext(Manipulator *rob, KDL::Chain *chain, double **ext_wrench,
   // constraint torques
   KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob->nj);
 
-  int r = vereshchagin_solver_fext.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext, ff_tau_jnt,
-                                             constraint_tau_jnt);
+  int r = vereshchagin_solver_fext.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext,
+                                             ff_tau_jnt, constraint_tau_jnt);
 
   if (r < 0)
   {
@@ -310,8 +313,9 @@ void achd_solver_fext(Manipulator *rob, KDL::Chain *chain, double **ext_wrench,
 }
 
 void achd_solver(Manipulator *rob, KDL::Chain *chain, int num_constraints,
-                 double *root_acceleration, double **alpha, double *beta, double **ext_wrench,
-                 double *tau_ff, double *predicted_acc, double *constraint_tau)
+                 double *root_acceleration, double **alpha, double *beta,
+                 double **ext_wrench, double *tau_ff, double *predicted_acc,
+                 double *constraint_tau)
 {
   // root acceleration
   KDL::Twist root_acc(
@@ -376,8 +380,8 @@ void achd_solver(Manipulator *rob, KDL::Chain *chain, int num_constraints,
   // constraint torques
   KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob->nj);
 
-  int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext, ff_tau_jnt,
-                                        constraint_tau_jnt);
+  int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext,
+                                        ff_tau_jnt, constraint_tau_jnt);
 
   if (r < 0)
   {
@@ -436,6 +440,19 @@ void get_manipulator_data(Manipulator *rob, kinova_mediator *mediator)
   }
 }
 
+void set_manipulator_torques(Manipulator *rob, kinova_mediator *mediator,
+                             double *tau_command)
+{
+  KDL::JntArray tau_cmd(rob->nj);
+
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    tau_cmd(i) = tau_command[i];
+  }
+
+  mediator->set_joint_torques(tau_cmd);
+}
+
 void computeDistance(std::string *between_ents, std::string asb, Manipulator *rob,
                      KDL::Chain *chain, double &distance)
 {
@@ -465,8 +482,9 @@ void computeDistance(std::string *between_ents, std::string asb, Manipulator *ro
 }
 
 void computeForwardVelocityKinematics(std::string link_name, std::string as_seen_by,
-                                      std::string with_respect_to, double *vec, Manipulator *rob,
-                                      KDL::Chain *robot_chain, double out_twist)
+                                      std::string with_respect_to, double *vec,
+                                      Manipulator *rob, KDL::Chain *robot_chain,
+                                      double out_twist)
 {
   int seg_nr = -1;
   getLinkIdFromChain(*robot_chain, link_name, seg_nr);
@@ -490,8 +508,8 @@ void computeForwardVelocityKinematics(std::string link_name, std::string as_seen
   // TODO: implement this
 }
 
-void computeForce(std::string applied_by, std::string applied_to, std::string asb, double *vec,
-                  Manipulator *rob, KDL::Chain *chain, double &force)
+void computeForce(std::string applied_by, std::string applied_to, std::string asb,
+                  double *vec, Manipulator *rob, KDL::Chain *chain, double &force)
 {
   // TODO: implement this
 }

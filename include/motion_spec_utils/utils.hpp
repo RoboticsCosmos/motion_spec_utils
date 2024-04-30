@@ -45,6 +45,18 @@
 #include "kdl/tree.hpp"
 #include "kdl_parser/kdl_parser.hpp"
 #include "kelo_motion_control/mediator.h"
+
+#include <ActuatorConfigClientRpc.h>
+#include <BaseClientRpc.h>
+#include <BaseCyclicClientRpc.h>
+#include <KDetailedException.h>
+#include <RouterClient.h>
+#include <SessionClientRpc.h>
+#include <SessionManager.h>
+#include <TransportClientTcp.h>
+#include <TransportClientUdp.h>
+#include <google/protobuf/util/json_util.h>
+
 #include "kinova_mediator/mediator.hpp"
 #include "motion_spec_utils/robot_structs.hpp"
 
@@ -135,9 +147,14 @@ void achd_solver_fext(Manipulator *rob, KDL::Chain *chain, double **ext_wrench,
 void rne_solver(Manipulator *rob, KDL::Chain *chain, double *root_acceleration,
                 double **ext_wrench, double *constraint_tau);
 
+void base_fd_solver(MobileBase *base, double *platform_force, double *constraint_tau);
+
 void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id);
 
 void get_manipulator_data(Manipulator *rob, kinova_mediator *mediator);
+
+void set_manipulator_torques(Manipulator *rob, kinova_mediator *mediator,
+                             double *tau_command);
 
 void computeDistance(std::string *between_ents, std::string asb, Manipulator *rob,
                      KDL::Chain *chain, double &distance);

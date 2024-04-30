@@ -13,6 +13,7 @@ struct Manipulator
   double **s_ddot;
   double *tau_command;
   double *tau_measured;
+  double *f_tool_command;
   double *f_tool_measured;
 };
 
