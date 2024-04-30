@@ -141,29 +141,6 @@ void initialize_robot_chain(std::string robot_urdf, std::string base_link, std::
 //   out_twist[5] = twist.rot.z();
 // }
 
-void computeForwardVelocityKinematics(std::string link_name, std::string as_seen_by,
-                                      std::string with_respect_to, double *vec, Manipulator *rob,
-                                      KDL::Chain *robot_chain, double out_twist)
-{
-  int seg_nr = -1;
-  getLinkIdFromChain(*robot_chain, link_name, seg_nr);
-
-  int as_seen_by_id = -1;
-  getLinkIdFromChain(*robot_chain, as_seen_by, as_seen_by_id);
-
-  int with_respect_to_id = -1;
-  getLinkIdFromChain(*robot_chain, with_respect_to, with_respect_to_id);
-
-  for (size_t i = 0; i < 6; i++)
-  {
-    if (vec[i] != 0)
-    {
-      out_twist = rob->s_dot[seg_nr][i];
-      break;
-    }
-  }
-}
-
 void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id)
 {
   for (int i = 0; i < chain.getNrOfSegments(); i++)
@@ -457,4 +434,92 @@ void get_manipulator_data(Manipulator *rob, kinova_mediator *mediator)
   {
     rob->f_tool_measured[i] = f_tool_measured(i);
   }
+}
+
+void computeDistance(std::string *between_ents, std::string asb, Manipulator *rob,
+                     KDL::Chain *chain, double &distance)
+{
+  int link_id1 = -1;
+  int link_id2 = -1;
+  getLinkIdFromChain(*chain, between_ents[0], link_id1);
+  getLinkIdFromChain(*chain, between_ents[1], link_id2);
+
+  int asb_id = -1;
+  getLinkIdFromChain(*chain, asb, asb_id);
+
+  KDL::Frame frame1, frame2, frame_asb;
+  KDL::ChainFkSolverPos_recursive fk_solver(*chain);
+
+  KDL::JntArray q = KDL::JntArray(rob->nj);
+
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    q(i) = rob->q[i];
+  }
+
+  fk_solver.JntToCart(q, frame1, link_id1);
+  fk_solver.JntToCart(q, frame2, link_id2);
+  fk_solver.JntToCart(q, frame_asb, asb_id);
+
+  distance = (frame1.p - frame_asb.p).Norm() + (frame2.p - frame_asb.p).Norm();
+}
+
+void computeForwardVelocityKinematics(std::string link_name, std::string as_seen_by,
+                                      std::string with_respect_to, double *vec, Manipulator *rob,
+                                      KDL::Chain *robot_chain, double out_twist)
+{
+  int seg_nr = -1;
+  getLinkIdFromChain(*robot_chain, link_name, seg_nr);
+
+  int as_seen_by_id = -1;
+  getLinkIdFromChain(*robot_chain, as_seen_by, as_seen_by_id);
+
+  int with_respect_to_id = -1;
+  getLinkIdFromChain(*robot_chain, with_respect_to, with_respect_to_id);
+
+  for (size_t i = 0; i < 6; i++)
+  {
+    if (vec[i] != 0)
+    {
+      out_twist = rob->s_dot[seg_nr][i];
+      break;
+    }
+  }
+
+  // if as_seen_by is not "base_link", then transform the twist to the base_link frame
+  // TODO: implement this
+}
+
+void computeForce(std::string applied_by, std::string applied_to, std::string asb, double *vec,
+                  Manipulator *rob, KDL::Chain *chain, double &force)
+{
+  // TODO: implement this
+}
+
+void findVector(std::string from_ent, std::string to_ent, Manipulator *rob,
+                KDL::Chain *chain, double *vec)
+{
+  int from_id = -1;
+  int to_id = -1;
+  getLinkIdFromChain(*chain, from_ent, from_id);
+  getLinkIdFromChain(*chain, to_ent, to_id);
+
+  KDL::Frame frame_from, frame_to;
+  KDL::ChainFkSolverPos_recursive fk_solver(*chain);
+
+  KDL::JntArray q = KDL::JntArray(rob->nj);
+
+  for (size_t i = 0; i < rob->nj; i++)
+  {
+    q(i) = rob->q[i];
+  }
+
+  fk_solver.JntToCart(q, frame_from, from_id);
+  fk_solver.JntToCart(q, frame_to, to_id);
+
+  KDL::Vector vec_kdl = frame_to.p - frame_from.p;
+
+  vec[0] = vec_kdl.x();
+  vec[1] = vec_kdl.y();
+  vec[2] = vec_kdl.z();
 }

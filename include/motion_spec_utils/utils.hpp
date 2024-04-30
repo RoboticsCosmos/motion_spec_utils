@@ -44,10 +44,9 @@
 #include "kdl/kinfam_io.hpp"
 #include "kdl/tree.hpp"
 #include "kdl_parser/kdl_parser.hpp"
-#include "motion_spec_utils/robot_structs.hpp"
-
 #include "kelo_motion_control/mediator.h"
 #include "kinova_mediator/mediator.hpp"
+#include "motion_spec_utils/robot_structs.hpp"
 
 /**
  * @brief Initializes the robot state struct.
@@ -66,7 +65,8 @@ void initialize_mobile_base_state(MobileBase *base);
  * @param init_q The initial joint positions.
  * @param rob [out] The robot state struct.
  */
-void initialize_robot_state(int num_joints, int num_segments, double *init_q, Manipulator *rob);
+void initialize_robot_state(int num_joints, int num_segments, double *init_q,
+                            Manipulator *rob);
 
 /**
  * @brief Initializes the robot chain.
@@ -75,22 +75,24 @@ void initialize_robot_state(int num_joints, int num_segments, double *init_q, Ma
  * @param tool_link The name of the tool link.
  * @param robot_chain [out] The KDL chain representing the robot.
  */
-void initialize_robot_chain(std::string robot_urdf, std::string base_link, std::string tool_link,
-                            KDL::Chain &robot_chain);
+void initialize_robot_chain(std::string robot_urdf, std::string base_link,
+                            std::string tool_link, KDL::Chain &robot_chain);
 
 /**
  * @brief Computes forward velocity kinematics.
  * @param link_name The name of the link.
  * @param as_seen_by The name of the link from which the twist is computed.
- * @param with_respect_to The name of the link with respect to which the twist is computed.
+ * @param with_respect_to The name of the link with respect to which the twist is
+ * computed.
  * @param vec The direction vector.
  * @param rob Robot state struct.
  * @param robot_chain The KDL chain representing the robot.
  * @param out_twist [out] The twist of the link.
  */
 void computeForwardVelocityKinematics(std::string link_name, std::string as_seen_by,
-                                      std::string with_respect_to, double *vec, Manipulator *rob,
-                                      KDL::Chain *robot_chain, double out_twist);
+                                      std::string with_respect_to, double *vec,
+                                      Manipulator *rob, KDL::Chain *robot_chain,
+                                      double out_twist);
 
 /**
  * @brief Adds two arrays.
@@ -123,8 +125,9 @@ void updateQandQdot(double *q_ddot, double dt, Manipulator *rob);
  * @param constraint_tau [out] The output constraint torques.
  */
 void achd_solver(Manipulator *rob, KDL::Chain *chain, int num_constraints,
-                 double *root_acceleration, double **alpha, double *beta, double **ext_wrench,
-                 double *tau_ff, double *predicted_acc, double *constraint_tau);
+                 double *root_acceleration, double **alpha, double *beta,
+                 double **ext_wrench, double *tau_ff, double *predicted_acc,
+                 double *constraint_tau);
 
 void achd_solver_fext(Manipulator *rob, KDL::Chain *chain, double **ext_wrench,
                       double *constraint_tau);
@@ -135,5 +138,14 @@ void rne_solver(Manipulator *rob, KDL::Chain *chain, double *root_acceleration,
 void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id);
 
 void get_manipulator_data(Manipulator *rob, kinova_mediator *mediator);
+
+void computeDistance(std::string *between_ents, std::string asb, Manipulator *rob,
+                     KDL::Chain *chain, double &distance);
+
+void computeForce(std::string applied_by, std::string applied_to, std::string asb,
+                  double *vec, Manipulator *rob, KDL::Chain *chain, double &force);
+
+void findVector(std::string from_ent, std::string to_ent, Manipulator *rob,
+                KDL::Chain *chain, double *vec);
 
 #endif  // UTILS_HPP
