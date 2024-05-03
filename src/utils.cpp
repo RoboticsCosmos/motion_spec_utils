@@ -86,6 +86,7 @@ void initialize_robot_state(int num_joints, int num_segments, double *init_q,
 
   rob->tau_command = new double[num_joints]{};
   rob->tau_measured = new double[num_joints]{};
+  rob->f_tool_command = new double[6]{};
   rob->f_tool_measured = new double[6]{};
 }
 
@@ -211,8 +212,6 @@ void rne_solver(Manipulator *rob, KDL::Chain *chain, double *root_acceleration,
   KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob->nj);
 
   int r = rne.CartToJnt(q, qd, qdd, f_ext, constraint_tau_jnt);
-
-  std::cout << "[rne] tau: " << constraint_tau_jnt << std::endl;
 
   if (r < 0)
   {
@@ -540,4 +539,19 @@ void findVector(std::string from_ent, std::string to_ent, Manipulator *rob,
   vec[0] = vec_kdl.x();
   vec[1] = vec_kdl.y();
   vec[2] = vec_kdl.z();
+}
+
+void findNormalizedVector(const double *vec, double *vec_norm)
+{
+  double norm = 0.0;
+  for (size_t i = 0; i < sizeof(vec) / sizeof(vec[0]); i++)
+  {
+    norm += vec[i] * vec[i];
+  }
+  norm = sqrt(norm);
+
+  for (size_t i = 0; i < sizeof(vec) / sizeof(vec[0]); i++)
+  {
+    vec_norm[i] = vec[i] / norm;
+  }
 }

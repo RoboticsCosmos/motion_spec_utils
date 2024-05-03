@@ -27,6 +27,17 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#include <ActuatorConfigClientRpc.h>
+#include <BaseClientRpc.h>
+#include <BaseCyclicClientRpc.h>
+#include <KDetailedException.h>
+#include <RouterClient.h>
+#include <SessionClientRpc.h>
+#include <SessionManager.h>
+#include <TransportClientTcp.h>
+#include <TransportClientUdp.h>
+#include <google/protobuf/util/json_util.h>
+
 #include <array>
 #include <iostream>
 #include <string>
@@ -45,18 +56,6 @@
 #include "kdl/tree.hpp"
 #include "kdl_parser/kdl_parser.hpp"
 #include "kelo_motion_control/mediator.h"
-
-#include <ActuatorConfigClientRpc.h>
-#include <BaseClientRpc.h>
-#include <BaseCyclicClientRpc.h>
-#include <KDetailedException.h>
-#include <RouterClient.h>
-#include <SessionClientRpc.h>
-#include <SessionManager.h>
-#include <TransportClientTcp.h>
-#include <TransportClientUdp.h>
-#include <google/protobuf/util/json_util.h>
-
 #include "kinova_mediator/mediator.hpp"
 #include "motion_spec_utils/robot_structs.hpp"
 
@@ -164,5 +163,11 @@ void computeForce(std::string applied_by, std::string applied_to, std::string as
 
 void findVector(std::string from_ent, std::string to_ent, Manipulator *rob,
                 KDL::Chain *chain, double *vec);
+
+void findNormalizedVector(const double *vec, double *vec_norm);
+
+void decomposeSignal(const std::string from_ent, const std::string to_ent,
+                     const double signal, Manipulator *rob, KDL::Chain *chain,
+                     double *vec);
 
 #endif  // UTILS_HPP
