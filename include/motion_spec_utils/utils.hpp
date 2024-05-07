@@ -125,6 +125,9 @@ extern void add(double *arr1, double *arr2, double *result, size_t size);
  */
 void updateQandQdot(double *q_ddot, double dt, ManipulatorState *rob);
 
+void findManipulatorStateFromRootLink(std::string root_link, Freddy *rob,
+                                      ManipulatorState *state);
+
 /**
  * @brief Solves the hybrid dynamics problem for a given robot chain.
  * @param rob The robot state struct.
@@ -138,39 +141,43 @@ void updateQandQdot(double *q_ddot, double dt, ManipulatorState *rob);
  * @param predicted_acc [out] The output predicted joint accelerations.
  * @param constraint_tau [out] The output constraint torques.
  */
-void achd_solver(ManipulatorState *rob, KDL::Chain *chain, int num_constraints,
-                 double *root_acceleration, double **alpha, double *beta,
-                 double **ext_wrench, double *tau_ff, double *predicted_acc,
+void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
+                 int num_constraints, double *root_acceleration, double **alpha,
+                 double *beta, double *tau_ff, double *predicted_acc,
                  double *constraint_tau);
 
-void achd_solver_fext(ManipulatorState *rob, KDL::Chain *chain, double **ext_wrench,
-                      double *constraint_tau);
+void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
+                      double **ext_wrench, double *constraint_tau);
 
 void rne_solver(ManipulatorState *rob, KDL::Chain *chain, double *root_acceleration,
                 double **ext_wrench, double *constraint_tau);
 
 void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id);
 
-void get_manipulator_data(ManipulatorState *rob, kinova_mediator *mediator,
-                          KDL::Chain *chain);
+template <typename MediatorType>
+void get_manipulator_data(Manipulator<MediatorType> *rob, KDL::Tree *tree);
 
 void set_manipulator_torques(ManipulatorState *rob, kinova_mediator *mediator,
                              double *tau_command);
 
-// void computeDistance(std::string *between_ents, std::string asb, Manipulator *rob,
-//                      KDL::Chain *chain, double &distance);
+void getLinkSFromRob(std::string link_name, Freddy *rob, double *s);
+
+void computeDistance(std::string *between_ents, std::string asb, Freddy *rob,
+                     double &distance);
 
 void getLinkForce(std::string applied_by, std::string applied_to, std::string asb,
                   double *vec, Freddy *rob, double &force);
 
 void getLinkVelocity(std::string link_name, std::string as_seen_by,
-                       std::string with_respect_to, double *vec, Freddy *rob,
-                       double out_twist);
+                     std::string with_respect_to, double *vec, Freddy *rob,
+                     double out_twist);
 
-// void findVector(std::string from_ent, std::string to_ent, Manipulator *rob,
-//                 KDL::Chain *chain, double *vec);
+void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain,
+                     int &link_id);
 
-// void findNormalizedVector(const double *vec, double *vec_norm);
+void findVector(std::string from_ent, std::string to_ent, Freddy *rob, double *vec);
+
+void findNormalizedVector(const double *vec, double *normalized_vec);
 
 // void decomposeSignal(const std::string from_ent, const std::string to_ent,
 //                      const double signal, Manipulator *rob, KDL::Chain *chain,

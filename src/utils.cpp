@@ -286,9 +286,20 @@ void rne_solver(ManipulatorState *rob, KDL::Chain *chain, double *root_accelerat
   }
 }
 
-void achd_solver_fext(ManipulatorState *rob, KDL::Chain *chain, double **ext_wrench,
-                      double *constraint_tau)
+void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
+                      double **ext_wrench, double *constraint_tau)
 {
+  // create a chain from the root_link to the tip_link
+  KDL::Chain *chain = new KDL::Chain();
+  if (!rob->tree.getChain(root_link, tip_link, *chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+  }
+
+  // get the corresponding robot state
+  ManipulatorState *rob_state;
+  findManipulatorStateFromRootLink(root_link, rob, rob_state);
+
   // root acceleration
   KDL::Twist root_acc(KDL::Vector(0.0, 0.0, 0.0), KDL::Vector(0.0, 0.0, 0.0));
 
@@ -304,19 +315,19 @@ void achd_solver_fext(ManipulatorState *rob, KDL::Chain *chain, double **ext_wre
   KDL::JntArray beta_jnt = KDL::JntArray(num_constraints);
 
   // q, qd, qdd
-  KDL::JntArray q = KDL::JntArray(rob->nj);
-  KDL::JntArray qd = KDL::JntArray(rob->nj);
+  KDL::JntArray q = KDL::JntArray(rob_state->nj);
+  KDL::JntArray qd = KDL::JntArray(rob_state->nj);
 
-  for (size_t i = 0; i < rob->nj; i++)
+  for (size_t i = 0; i < rob_state->nj; i++)
   {
-    q(i) = rob->q[i];
-    qd(i) = rob->q_dot[i];
+    q(i) = rob_state->q[i];
+    qd(i) = rob_state->q_dot[i];
   }
 
   // ext wrench
   KDL::Wrenches f_ext;
 
-  for (int i = 0; i < rob->ns; i++)
+  for (int i = 0; i < rob_state->ns; i++)
   {
     KDL::Wrench wrench;
     for (int j = 0; j < 6; j++)
@@ -327,13 +338,13 @@ void achd_solver_fext(ManipulatorState *rob, KDL::Chain *chain, double **ext_wre
   }
 
   // feedforward torques
-  KDL::JntArray ff_tau_jnt = KDL::JntArray(rob->nj);
+  KDL::JntArray ff_tau_jnt = KDL::JntArray(rob_state->nj);
 
   // predicted accelerations
-  KDL::JntArray qdd = KDL::JntArray(rob->nj);
+  KDL::JntArray qdd = KDL::JntArray(rob_state->nj);
 
   // constraint torques
-  KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob->nj);
+  KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob_state->nj);
 
   int r = vereshchagin_solver_fext.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext,
                                              ff_tau_jnt, constraint_tau_jnt);
@@ -344,17 +355,45 @@ void achd_solver_fext(ManipulatorState *rob, KDL::Chain *chain, double **ext_wre
     std::cerr << "Error code: " << r << std::endl;
   }
 
-  for (size_t i = 0; i < rob->nj; i++)
+  for (size_t i = 0; i < rob_state->nj; i++)
   {
     constraint_tau[i] = constraint_tau_jnt(i);
   }
 }
 
-void achd_solver(ManipulatorState *rob, KDL::Chain *chain, int num_constraints,
-                 double *root_acceleration, double **alpha, double *beta,
-                 double **ext_wrench, double *tau_ff, double *predicted_acc,
+void findManipulatorStateFromRootLink(std::string root_link, Freddy *rob, ManipulatorState *state)
+{
+  if (root_link == rob->kinova_left->base_frame)
+  {
+    state = rob->kinova_left->state;
+  }
+  else if (root_link == rob->kinova_right->base_frame)
+  {
+    state = rob->kinova_right->state;
+  }
+  else
+  {
+    std::cerr << "Root link not found in the robot chains" << std::endl;
+  }
+}
+
+void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
+                 int num_constraints, double *root_acceleration, double **alpha,
+                 double *beta, double *tau_ff, double *predicted_acc,
                  double *constraint_tau)
 {
+
+  // create a chain from the root_link to the tip_link
+  KDL::Chain *chain = new KDL::Chain();
+  if (!rob->tree.getChain(root_link, tip_link, *chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+  }
+
+  // get the corresponding robot state
+  ManipulatorState *rob_state;
+  findManipulatorStateFromRootLink(root_link, rob, rob_state);
+
   // root acceleration
   KDL::Twist root_acc(
       KDL::Vector(root_acceleration[0], root_acceleration[1], root_acceleration[2]),
@@ -382,41 +421,41 @@ void achd_solver(ManipulatorState *rob, KDL::Chain *chain, int num_constraints,
   }
 
   // q, qd, qdd
-  KDL::JntArray q = KDL::JntArray(rob->nj);
-  KDL::JntArray qd = KDL::JntArray(rob->nj);
+  KDL::JntArray q = KDL::JntArray(rob_state->nj);
+  KDL::JntArray qd = KDL::JntArray(rob_state->nj);
 
-  for (size_t i = 0; i < rob->nj; i++)
+  for (size_t i = 0; i < rob_state->nj; i++)
   {
-    q(i) = rob->q[i];
-    qd(i) = rob->q_dot[i];
+    q(i) = rob_state->q[i];
+    qd(i) = rob_state->q_dot[i];
   }
 
   // ext wrench
   KDL::Wrenches f_ext;
 
-  for (int i = 0; i < rob->ns; i++)
+  for (int i = 0; i < rob_state->ns; i++)
   {
     KDL::Wrench wrench;
     for (int j = 0; j < 6; j++)
     {
-      wrench(j) = ext_wrench[i][j];
+      wrench(j) = 0.0;
     }
     f_ext.push_back(wrench);
   }
 
   // feedforward torques
-  KDL::JntArray ff_tau_jnt = KDL::JntArray(rob->nj);
+  KDL::JntArray ff_tau_jnt = KDL::JntArray(rob_state->nj);
 
-  for (size_t i = 0; i < rob->nj; i++)
+  for (size_t i = 0; i < rob_state->nj; i++)
   {
     ff_tau_jnt(i) = tau_ff[i];
   }
 
   // predicted accelerations
-  KDL::JntArray qdd = KDL::JntArray(rob->nj);
+  KDL::JntArray qdd = KDL::JntArray(rob_state->nj);
 
   // constraint torques
-  KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob->nj);
+  KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob_state->nj);
 
   int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext,
                                         ff_tau_jnt, constraint_tau_jnt);
@@ -427,65 +466,71 @@ void achd_solver(ManipulatorState *rob, KDL::Chain *chain, int num_constraints,
     std::cerr << "Error code: " << r << std::endl;
   }
 
-  for (size_t i = 0; i < rob->nj; i++)
+  for (size_t i = 0; i < rob_state->nj; i++)
   {
     predicted_acc[i] = qdd(i);
     constraint_tau[i] = constraint_tau_jnt(i);
   }
 }
 
-void get_manipulator_data(ManipulatorState *rob, kinova_mediator *mediator,
-                          KDL::Chain *chain)
+template <typename MediatorType>
+void get_manipulator_data(Manipulator<MediatorType> *rob, KDL::Tree *tree)
 {
-  KDL::JntArray q(rob->nj);
-  KDL::JntArray q_dot(rob->nj);
-  KDL::JntArray tau_measured(rob->nj);
+  KDL::JntArray q(rob->state->nj);
+  KDL::JntArray q_dot(rob->state->nj);
+  KDL::JntArray tau_measured(rob->state->nj);
   KDL::Wrench f_tool_measured;
 
-  mediator->get_robot_state(q, q_dot, tau_measured, f_tool_measured);
+  rob->mediator->get_robot_state(q, q_dot, tau_measured, f_tool_measured);
 
-  for (size_t i = 0; i < rob->nj; i++)
+  for (size_t i = 0; i < rob->state->nj; i++)
   {
-    rob->q[i] = q(i);
-    rob->q_dot[i] = q_dot(i);
-    rob->tau_measured[i] = tau_measured(i);
+    rob->state->q[i] = q(i);
+    rob->state->q_dot[i] = q_dot(i);
+    rob->state->tau_measured[i] = tau_measured(i);
   }
 
   for (size_t i = 0; i < 6; i++)
   {
-    rob->f_tool_measured[i] = f_tool_measured(i);
+    rob->state->f_tool_measured[i] = f_tool_measured(i);
   }
 
-  // TODO: construct chain here from base_link to the tool_link
+  // *Assumption* - computing values in the base_link frame
+  // create a chain from the base_link to the tool_link
+  KDL::Chain *chain = new KDL::Chain();
+  if (!tree->getChain("base_link", rob->tool_frame, *chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+  }
 
   // update the s_dot values
   KDL::ChainFkSolverVel_recursive fk_solver_vel(*chain);
-  std::vector<KDL::FrameVel> frame_vels(rob->ns);
-  KDL::JntArrayVel q_dot_kdl(rob->nj);
-  for (size_t i = 0; i < rob->nj; i++)
+  std::vector<KDL::FrameVel> frame_vels(rob->state->ns);
+  KDL::JntArrayVel q_dot_kdl(rob->state->nj);
+  for (size_t i = 0; i < rob->state->nj; i++)
   {
-    q_dot_kdl.q(i) = rob->q[i];
-    q_dot_kdl.qdot(i) = rob->q_dot[i];
+    q_dot_kdl.q(i) = rob->state->q[i];
+    q_dot_kdl.qdot(i) = rob->state->q_dot[i];
   }
   fk_solver_vel.JntToCart(q_dot_kdl, frame_vels);
 
-  for (size_t i = 0; i < rob->ns; i++)
+  for (size_t i = 0; i < rob->state->ns; i++)
   {
     // update the s_dot values
-    rob->s_dot[i][0] = frame_vels[i].GetTwist().vel.x();
-    rob->s_dot[i][1] = frame_vels[i].GetTwist().vel.y();
-    rob->s_dot[i][2] = frame_vels[i].GetTwist().vel.z();
-    rob->s_dot[i][3] = frame_vels[i].GetTwist().rot.x();
-    rob->s_dot[i][4] = frame_vels[i].GetTwist().rot.y();
-    rob->s_dot[i][5] = frame_vels[i].GetTwist().rot.z();
+    rob->state->s_dot[i][0] = frame_vels[i].GetTwist().vel.x();
+    rob->state->s_dot[i][1] = frame_vels[i].GetTwist().vel.y();
+    rob->state->s_dot[i][2] = frame_vels[i].GetTwist().vel.z();
+    rob->state->s_dot[i][3] = frame_vels[i].GetTwist().rot.x();
+    rob->state->s_dot[i][4] = frame_vels[i].GetTwist().rot.y();
+    rob->state->s_dot[i][5] = frame_vels[i].GetTwist().rot.z();
 
     // update the s values
-    rob->s[i][0] = frame_vels[i].GetFrame().p.x();
-    rob->s[i][1] = frame_vels[i].GetFrame().p.y();
-    rob->s[i][2] = frame_vels[i].GetFrame().p.z();
-    rob->s[i][3] = frame_vels[i].GetFrame().M.GetRot().x();
-    rob->s[i][4] = frame_vels[i].GetFrame().M.GetRot().y();
-    rob->s[i][5] = frame_vels[i].GetFrame().M.GetRot().z();
+    rob->state->s[i][0] = frame_vels[i].GetFrame().p.x();
+    rob->state->s[i][1] = frame_vels[i].GetFrame().p.y();
+    rob->state->s[i][2] = frame_vels[i].GetFrame().p.z();
+    rob->state->s[i][3] = frame_vels[i].GetFrame().M.GetRot().x();
+    rob->state->s[i][4] = frame_vels[i].GetFrame().M.GetRot().y();
+    rob->state->s[i][5] = frame_vels[i].GetFrame().M.GetRot().z();
   }
 }
 
@@ -502,66 +547,79 @@ void set_manipulator_torques(ManipulatorState *rob, kinova_mediator *mediator,
   mediator->set_joint_torques(tau_cmd);
 }
 
-// void computeDistance(std::string *between_ents, std::string asb, Manipulator *rob,
-//                      KDL::Chain *chain, double &distance)
-// {
-//   int link_id1 = -1;
-//   int link_id2 = -1;
-//   getLinkIdFromChain(*chain, between_ents[0], link_id1);
-//   getLinkIdFromChain(*chain, between_ents[1], link_id2);
-
-//   int asb_id = -1;
-//   getLinkIdFromChain(*chain, asb, asb_id);
-
-//   KDL::Frame frame1, frame2, frame_asb;
-//   KDL::ChainFkSolverPos_recursive fk_solver(*chain);
-
-//   KDL::JntArray q = KDL::JntArray(rob->nj);
-
-//   for (size_t i = 0; i < rob->nj; i++)
-//   {
-//     q(i) = rob->q[i];
-//   }
-
-//   fk_solver.JntToCart(q, frame1, link_id1);
-//   fk_solver.JntToCart(q, frame2, link_id2);
-//   fk_solver.JntToCart(q, frame_asb, asb_id);
-
-//   distance = (frame1.p - frame_asb.p).Norm() + (frame2.p - frame_asb.p).Norm();
-// }
-
-// void computeForwardVelocityKinematics(std::string link_name, std::string as_seen_by,
-//                                       std::string with_respect_to, double *vec,
-//                                       Manipulator *rob, KDL::Chain *robot_chain,
-//                                       double out_twist)
-// {
-//   int seg_nr = -1;
-//   getLinkIdFromChain(*robot_chain, link_name, seg_nr);
-
-//   int as_seen_by_id = -1;
-//   getLinkIdFromChain(*robot_chain, as_seen_by, as_seen_by_id);
-
-//   int with_respect_to_id = -1;
-//   getLinkIdFromChain(*robot_chain, with_respect_to, with_respect_to_id);
-
-//   for (size_t i = 0; i < 6; i++)
-//   {
-//     if (vec[i] != 0)
-//     {
-//       out_twist = rob->s_dot[seg_nr][i];
-//       break;
-//     }
-//   }
-
-//   // if as_seen_by is not "base_link", then transform the twist to the base_link frame
-//   // TODO: implement this
-// }
-
-void getLinkForce(std::string applied_by, std::string applied_to, std::string asb,
-                  double *vec, Freddy *freddy, double &force)
+void getLinkSFromRob(std::string link_name, Freddy *rob, double *s)
 {
-  // TODO: implement this
-  force = 0.0;
+  // find which robot the link belongs to
+  int link_id = -1;
+  bool is_in_left_chain, is_in_right_chain = false;
+  findLinkInChain(link_name, &rob->kinova_left->chain, is_in_left_chain, link_id);
+  findLinkInChain(link_name, &rob->kinova_right->chain, is_in_right_chain, link_id);
+
+  if (!is_in_left_chain && !is_in_right_chain)
+  {
+    std::cerr << "Link not found in the robot chains" << std::endl;
+    return;
+  }
+
+  // Select appropriate state data based on which chain the link was found in
+  const double *state = is_in_left_chain ? rob->kinova_left->state->s[link_id]
+                                         : rob->kinova_right->state->s[link_id];
+
+  for (size_t i = 0; i < 6; i++)
+  {
+    s[i] = state[i];
+  }
+}
+
+void computeDistance(std::string *between_ents, std::string asb, Freddy *rob,
+                     double &distance)
+{
+  double *ent1 = new double[6]{};
+  double *ent2 = new double[6]{};
+
+  getLinkSFromRob(between_ents[0], rob, ent1);
+  getLinkSFromRob(between_ents[1], rob, ent2);
+
+  if (asb == "base_link")
+  {
+    distance = sqrt(pow(ent1[0] - ent2[0], 2) + pow(ent1[1] - ent2[1], 2) +
+                    pow(ent1[2] - ent2[2], 2));
+  }
+  else
+  {
+    // construct a chain from the base_link to the asb link
+    KDL::Chain chain;
+    if (!rob->tree.getChain("base_link", asb, chain))
+    {
+      std::cerr << "Failed to get chain from KDL tree" << std::endl;
+      return;
+    }
+
+    // get the transform from the base_link to the asb link
+    KDL::Frame frame;
+    KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
+
+    if (chain.getNrOfJoints() == 0)
+    {
+      KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
+
+      fk_solver_pos.JntToCart(q, frame);
+
+      KDL::Vector vec1(ent1[0], ent1[1], ent1[2]);
+      KDL::Vector vec2(ent2[0], ent2[1], ent2[2]);
+
+      vec1 = frame.M * vec1;
+      vec2 = frame.M * vec2;
+
+      distance = sqrt(pow(vec1.x() - vec2.x(), 2) + pow(vec1.y() - vec2.y(), 2) +
+                      pow(vec1.z() - vec2.z(), 2));
+    }
+    else
+    {
+      std::cerr << "feature not implemented yet" << std::endl;
+      exit(1);
+    }
+  }
 }
 
 void getLinkVelocity(std::string link_name, std::string as_seen_by,
@@ -582,56 +640,39 @@ void getLinkVelocity(std::string link_name, std::string as_seen_by,
     return;
   }
 
-  if (is_in_left_chain)
+  // Select appropriate state data based on which chain the link was found in
+  const double *state = is_in_left_chain ? rob->kinova_left->state->s_dot[link_id]
+                                         : rob->kinova_right->state->s_dot[link_id];
+
+  bool require_transform = false;
+  if (as_seen_by == "base_link")
   {
-    bool need_transform = true;
-    if (as_seen_by == rob->kinova_left->base_frame)
+    for (size_t i = 0; i < 6; ++i)
     {
-      need_transform = false;
-    }
-
-    if (!need_transform)
-    {
-      for (size_t i = 0; i < 6; i++)
+      if (vec[i] != 0)
       {
-        if (vec[i] != 0)
-        {
-          out_twist = rob->kinova_left->state->s_dot[link_id][i];
-          break;
-        }
-      }
-      return;
-    }
-    else
-    {
-      KDL::Twist twist;
-
-      for (size_t i = 0; i < 6; i++)
-      {
-        twist(i) = vec[i];
-      }
-
-      // construct a chain from the base_link to the asb link
-      KDL::Chain chain;
-      if (!rob->tree.getChain(rob->kinova_left->base_frame, as_seen_by, chain))
-      {
-        std::cerr << "Failed to get chain from KDL tree" << std::endl;
+        out_twist = state[i];
         return;
       }
-
-      // get the transform from the base_link to the asb link
-      KDL::Frame frame;
-      KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
-
-
     }
-
   }
-
-
+  else
+  {
+    // Transformation of the twist is not yet implemented
+    std::cerr << "Transformation feature not implemented yet" << std::endl;
+    exit(1);
+  }
 }
 
-void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain, int &link_id)
+void getLinkForce(std::string applied_by, std::string applied_to, std::string asb,
+                  double *vec, Freddy *freddy, double &force)
+{
+  // TODO: implement this
+  force = 0.0;
+}
+
+void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain,
+                     int &link_id)
 {
   is_in_chain = false;
   for (int i = 0; i < chain->getNrOfSegments(); i++)
@@ -645,55 +686,41 @@ void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain
   }
 }
 
-// void findVector(std::string from_ent, std::string to_ent, Manipulator *rob,
-//                 KDL::Chain *chain, double *vec)
-// {
-//   int from_id = -1;
-//   int to_id = -1;
-//   getLinkIdFromChain(*chain, from_ent, from_id);
-//   getLinkIdFromChain(*chain, to_ent, to_id);
+void findVector(std::string from_ent, std::string to_ent, Freddy *rob, double *vec)
+{
+  int from_id, to_id = -1;
+  bool is_in_left_chain, is_in_right_chain = false;
+  double *from_s = new double[6]{};
+  double *to_s = new double[6]{};
 
-//   KDL::Frame frame_from, frame_to;
-//   KDL::ChainFkSolverPos_recursive fk_solver(*chain);
+  getLinkSFromRob(from_ent, rob, from_s);
+  getLinkSFromRob(to_ent, rob, to_s);
 
-//   KDL::JntArray q = KDL::JntArray(rob->nj);
+  for (size_t i = 0; i < sizeof(vec) / sizeof(vec[0]); i++)
+  {
+    vec[i] = to_s[i] - from_s[i];
+  }
+}
 
-//   for (size_t i = 0; i < rob->nj; i++)
-//   {
-//     q(i) = rob->q[i];
-//   }
+void findNormalizedVector(const double *vec, double *normalized_vec)
+{
+  double norm = 0.0;
+  for (size_t i = 0; i < sizeof(vec) / sizeof(vec[0]); i++)
+  {
+    norm += vec[i] * vec[i];
+  }
+  norm = sqrt(norm);
 
-//   fk_solver.JntToCart(q, frame_from, from_id);
-//   fk_solver.JntToCart(q, frame_to, to_id);
-
-//   KDL::Vector vec_kdl = frame_to.p - frame_from.p;
-
-//   vec[0] = vec_kdl.x();
-//   vec[1] = vec_kdl.y();
-//   vec[2] = vec_kdl.z();
-// }
-
-// void findNormalizedVector(const double *vec, double *vec_norm)
-// {
-//   double norm = 0.0;
-//   for (size_t i = 0; i < sizeof(vec) / sizeof(vec[0]); i++)
-//   {
-//     norm += vec[i] * vec[i];
-//   }
-//   norm = sqrt(norm);
-
-//   for (size_t i = 0; i < sizeof(vec) / sizeof(vec[0]); i++)
-//   {
-//     vec_norm[i] = vec[i] / norm;
-//   }
-// }
+  for (size_t i = 0; i < sizeof(vec) / sizeof(vec[0]); i++)
+  {
+    normalized_vec[i] = vec[i] / norm;
+  }
+}
 
 void get_robot_data(Freddy *freddy)
 {
-  get_manipulator_data(freddy->kinova_left->state, freddy->kinova_left->mediator,
-                       &freddy->kinova_left->chain);
-  get_manipulator_data(freddy->kinova_right->state, freddy->kinova_right->mediator,
-                       &freddy->kinova_right->chain);
+  get_manipulator_data(freddy->kinova_left, &freddy->tree);
+  get_manipulator_data(freddy->kinova_right, &freddy->tree);
   get_kelo_base_state(freddy->mobile_base->mediator->kelo_base_config,
                       freddy->mobile_base->mediator->ethercat_config,
                       freddy->mobile_base->state->pivot_angles);
