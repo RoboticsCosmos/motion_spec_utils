@@ -65,9 +65,10 @@
  * @param num_segments The number of segments.
  * @param rob [out] The robot state struct.
  */
-void initialize_manipulator_state(int num_joints, int num_segments, Manipulator *rob);
+void initialize_manipulator_state(int num_joints, int num_segments,
+                                  ManipulatorState *rob);
 
-void initialize_mobile_base_state(MobileBase *base);
+void initialize_mobile_base_state(MobileBaseState *base);
 
 /**
  * @brief Initializes the robot state struct.
@@ -76,8 +77,10 @@ void initialize_mobile_base_state(MobileBase *base);
  * @param init_q The initial joint positions.
  * @param rob [out] The robot state struct.
  */
-void initialize_robot_state(int num_joints, int num_segments, double *init_q,
-                            Manipulator *rob);
+// void initialize_robot_state(int num_joints, int num_segments, double *init_q,
+//                             Manipulator *rob);
+
+void initialize_robot(std::string robot_urdf, Freddy *freddy);
 
 /**
  * @brief Initializes the robot chain.
@@ -100,10 +103,10 @@ void initialize_robot_chain(std::string robot_urdf, std::string base_link,
  * @param robot_chain The KDL chain representing the robot.
  * @param out_twist [out] The twist of the link.
  */
-void computeForwardVelocityKinematics(std::string link_name, std::string as_seen_by,
-                                      std::string with_respect_to, double *vec,
-                                      Manipulator *rob, KDL::Chain *robot_chain,
-                                      double out_twist);
+// void computeForwardVelocityKinematics(std::string link_name, std::string as_seen_by,
+//                                       std::string with_respect_to, double *vec,
+//                                       Manipulator *rob, KDL::Chain *robot_chain,
+//                                       double out_twist);
 
 /**
  * @brief Adds two arrays.
@@ -120,7 +123,7 @@ extern void add(double *arr1, double *arr2, double *result, size_t size);
  * @param dt The time step.
  * @param rob [in/out] The robot state struct.
  */
-void updateQandQdot(double *q_ddot, double dt, Manipulator *rob);
+void updateQandQdot(double *q_ddot, double dt, ManipulatorState *rob);
 
 /**
  * @brief Solves the hybrid dynamics problem for a given robot chain.
@@ -135,39 +138,44 @@ void updateQandQdot(double *q_ddot, double dt, Manipulator *rob);
  * @param predicted_acc [out] The output predicted joint accelerations.
  * @param constraint_tau [out] The output constraint torques.
  */
-void achd_solver(Manipulator *rob, KDL::Chain *chain, int num_constraints,
+void achd_solver(ManipulatorState *rob, KDL::Chain *chain, int num_constraints,
                  double *root_acceleration, double **alpha, double *beta,
                  double **ext_wrench, double *tau_ff, double *predicted_acc,
                  double *constraint_tau);
 
-void achd_solver_fext(Manipulator *rob, KDL::Chain *chain, double **ext_wrench,
+void achd_solver_fext(ManipulatorState *rob, KDL::Chain *chain, double **ext_wrench,
                       double *constraint_tau);
 
-void rne_solver(Manipulator *rob, KDL::Chain *chain, double *root_acceleration,
+void rne_solver(ManipulatorState *rob, KDL::Chain *chain, double *root_acceleration,
                 double **ext_wrench, double *constraint_tau);
-
-void base_fd_solver(MobileBase *base, double *platform_force, double *constraint_tau);
 
 void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id);
 
-void get_manipulator_data(Manipulator *rob, kinova_mediator *mediator);
+void get_manipulator_data(ManipulatorState *rob, kinova_mediator *mediator,
+                          KDL::Chain *chain);
 
-void set_manipulator_torques(Manipulator *rob, kinova_mediator *mediator,
+void set_manipulator_torques(ManipulatorState *rob, kinova_mediator *mediator,
                              double *tau_command);
 
-void computeDistance(std::string *between_ents, std::string asb, Manipulator *rob,
-                     KDL::Chain *chain, double &distance);
+// void computeDistance(std::string *between_ents, std::string asb, Manipulator *rob,
+//                      KDL::Chain *chain, double &distance);
 
-void computeForce(std::string applied_by, std::string applied_to, std::string asb,
-                  double *vec, Manipulator *rob, KDL::Chain *chain, double &force);
+void getLinkForce(std::string applied_by, std::string applied_to, std::string asb,
+                  double *vec, Freddy *rob, double &force);
 
-void findVector(std::string from_ent, std::string to_ent, Manipulator *rob,
-                KDL::Chain *chain, double *vec);
+void getLinkVelocity(std::string link_name, std::string as_seen_by,
+                       std::string with_respect_to, double *vec, Freddy *rob,
+                       double out_twist);
 
-void findNormalizedVector(const double *vec, double *vec_norm);
+// void findVector(std::string from_ent, std::string to_ent, Manipulator *rob,
+//                 KDL::Chain *chain, double *vec);
 
-void decomposeSignal(const std::string from_ent, const std::string to_ent,
-                     const double signal, Manipulator *rob, KDL::Chain *chain,
-                     double *vec);
+// void findNormalizedVector(const double *vec, double *vec_norm);
+
+// void decomposeSignal(const std::string from_ent, const std::string to_ent,
+//                      const double signal, Manipulator *rob, KDL::Chain *chain,
+//                      double *vec);
+
+void get_robot_data(Freddy *freddy);
 
 #endif  // UTILS_HPP

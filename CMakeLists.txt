@@ -67,7 +67,7 @@ target_link_libraries(solver_utils orocos-kdl)
 
 # install
 install(
-  TARGETS math_utils mutils solver_utils
+  TARGETS math_utils solver_utils mutils
   EXPORT ${PROJECT_NAME}-targets
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib

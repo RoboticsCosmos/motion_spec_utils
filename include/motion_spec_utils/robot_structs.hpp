@@ -1,7 +1,13 @@
 #ifndef ROB_STRUCTS_HPP
 #define ROB_STRUCTS_HPP
 
-struct Manipulator
+#include "kinova_mediator/mediator.hpp"
+#include "kelo_motion_control/mediator.h"
+
+#include <kdl/tree.hpp>
+#include <kdl/chain.hpp>
+
+struct ManipulatorState
 {
   int nj;
   int ns;
@@ -17,17 +23,48 @@ struct Manipulator
   double *f_tool_measured;
 };
 
-struct MobileBase
+template <typename MediatorType>
+struct Manipulator
+{
+  ManipulatorState *state;
+  MediatorType *mediator;
+
+  std::string base_frame;
+  std::string tool_frame;
+
+  KDL::Chain chain;
+};
+
+typedef Manipulator<kinova_mediator> KinovaManipulator;
+
+struct MobileBaseState
 {
   double *pivot_angles;
   double *tau_command;
 };
 
+template <typename MediatorType>
+struct MobileBase
+{
+  MobileBaseState *state;
+  MediatorType *mediator;
+};
+
+struct Robile
+{
+  EthercatConfig *ethercat_config;
+  KeloBaseConfig *kelo_base_config;
+};
+
+typedef MobileBase<Robile> RobileBase;
+
 struct Freddy
 {
-  Manipulator *arm1;
-  Manipulator *arm2;
-  MobileBase *robile;
+  KinovaManipulator *kinova_left;
+  KinovaManipulator *kinova_right;
+  RobileBase *mobile_base;
+
+  KDL::Tree tree;
 };
 
 #endif  // ROB_STRUCTS_HPP
