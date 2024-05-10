@@ -7,14 +7,21 @@ set(CMAKE_INSTALL_DIR share/${PROJECT_NAME}/cmake)
 
 add_compile_definitions(_OS_UNIX)
 
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
 # add path to CMAKE_PREFIX_PATH
-list(APPEND CMAKE_PREFIX_PATH /home/batsy/rc/build/)
-list(APPEND CMAKE_MODULE_PATH /home/batsy/rc/build/)
+list(APPEND CMAKE_PREFIX_PATH ${CMAKE_BINARY_DIR}/../build/)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_BINARY_DIR}/../build/)
+
+# link directories
+link_directories(${CMAKE_INSTALL_PREFIX}/lib/)
 
 find_package(Eigen3 REQUIRED)
 find_package(kdl_parser REQUIRED)
 find_package(orocos_kdl REQUIRED)
 find_package(kinova_mediator REQUIRED)
+find_package(kelo_motion_control REQUIRED)
 
 # append orocos include dirs
 list(APPEND local_INCLUDE_DIRS ${CMAKE_INSTALL_PREFIX}/include/)
@@ -34,9 +41,6 @@ include_directories(
   ${CMAKE_INSTALL_PREFIX}/include/kinova_api/google
 )
 
-# link directories
-link_directories(${CMAKE_INSTALL_PREFIX}/lib/)
-
 # add library
 add_library(math_utils SHARED src/math_utils.cpp)
 target_include_directories(math_utils PUBLIC
@@ -51,11 +55,12 @@ target_include_directories(mutils PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(mutils 
-  kdl_parser 
-  orocos-kdl 
+  kdl_parser
+  orocos-kdl
   kinova_mediator
   KortexApiCpp
   pthread
+  kelo_motion_control
 )
 
 add_library(solver_utils SHARED src/solver_utils.cpp)

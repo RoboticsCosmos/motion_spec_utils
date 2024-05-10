@@ -27,6 +27,9 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#define DEG2RAD(x) ((x) * M_PI / 180.0)
+#define RAD2DEG(x) ((x) * 180.0 / M_PI)
+
 #include <ActuatorConfigClientRpc.h>
 #include <BaseClientRpc.h>
 #include <BaseCyclicClientRpc.h>
@@ -55,9 +58,9 @@
 #include "kdl/kinfam_io.hpp"
 #include "kdl/tree.hpp"
 #include "kdl_parser/kdl_parser.hpp"
-#include "kelo_motion_control/mediator.h"
 #include "kinova_mediator/mediator.hpp"
 #include "motion_spec_utils/robot_structs.hpp"
+
 
 /**
  * @brief Initializes the robot state struct.
@@ -81,6 +84,8 @@ void initialize_mobile_base_state(MobileBaseState *base);
 //                             Manipulator *rob);
 
 void initialize_robot(std::string robot_urdf, Freddy *freddy);
+
+void initialize_robot_sim(std::string robot_urdf, Freddy *freddy);
 
 /**
  * @brief Initializes the robot chain.
@@ -147,18 +152,25 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
                  double *constraint_tau);
 
 void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
-                      double **ext_wrench, double *constraint_tau);
+                      double *ext_wrench_tool, double *constraint_tau);
 
 void rne_solver(ManipulatorState *rob, KDL::Chain *chain, double *root_acceleration,
                 double **ext_wrench, double *constraint_tau);
 
+void base_fd_solver(Freddy *rob, double *platform_force, double *wheel_torques);
+
 void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id);
 
 template <typename MediatorType>
-void get_manipulator_data(Manipulator<MediatorType> *rob, KDL::Tree *tree);
+void get_manipulator_data(Manipulator<MediatorType> *rob);
 
-void set_manipulator_torques(ManipulatorState *rob, kinova_mediator *mediator,
+void update_manipulator_state(ManipulatorState *state, std::string tool_frame,
+                              KDL::Tree *tree);
+
+void set_manipulator_torques(Freddy *rob, std::string root_link, std::string tip_link,
                              double *tau_command);
+
+void set_mobile_base_torques(Freddy *rob, double *tau_command);
 
 void getLinkSFromRob(std::string link_name, Freddy *rob, double *s);
 
@@ -179,10 +191,20 @@ void findVector(std::string from_ent, std::string to_ent, Freddy *rob, double *v
 
 void findNormalizedVector(const double *vec, double *normalized_vec);
 
-// void decomposeSignal(const std::string from_ent, const std::string to_ent,
-//                      const double signal, Manipulator *rob, KDL::Chain *chain,
-//                      double *vec);
+void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string to_ent,
+                     std::string asb_ent, const double signal, double *vec);
 
-void get_robot_data(Freddy *freddy);
+void get_robot_data(Freddy *rob);
+
+void get_robot_data_sim(Freddy *freddy);
+
+void set_init_sim_data(Freddy *freddy);
+
+void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string target_frame,
+                          double **alpha, double *beta, int nc,
+                          double **transformed_alpha, double *transformed_beta);
+
+void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent,
+                      double *wrench, double *transformed_wrench);
 
 #endif  // UTILS_HPP

@@ -64,7 +64,7 @@ struct Freddy
   KinovaManipulator *kinova_right;
   RobileBase *mobile_base;
 
-  KDL::Tree tree;
+  KDL::Tree tree = KDL::Tree();
 };
 
 #endif  // ROB_STRUCTS_HPP
