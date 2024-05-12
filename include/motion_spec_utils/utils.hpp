@@ -130,9 +130,6 @@ extern void add(double *arr1, double *arr2, double *result, size_t size);
  */
 void updateQandQdot(double *q_ddot, double dt, ManipulatorState *rob);
 
-void findManipulatorStateFromRootLink(std::string root_link, Freddy *rob,
-                                      ManipulatorState *state);
-
 /**
  * @brief Solves the hybrid dynamics problem for a given robot chain.
  * @param rob The robot state struct.
