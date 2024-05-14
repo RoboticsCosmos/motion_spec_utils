@@ -80,7 +80,7 @@ void free_manipulator(Manipulator<kinova_mediator> *rob);
 
 void free_mobile_base(MobileBase<Robile> *base);
 
-void free_freddy(Freddy *rob);
+void free_robot_data(Freddy *rob);
 
 /**
  * @brief Initializes the robot state struct.

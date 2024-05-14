@@ -106,7 +106,7 @@ void free_mobile_base(MobileBase<Robile> *base)
   delete[] base->mediator->kelo_base_config->pivot_angles_deviation;
 }
 
-void free_freddy(Freddy *rob)
+void free_robot_data(Freddy *rob)
 {
   free_manipulator(rob->kinova_left);
   free_manipulator(rob->kinova_right);
@@ -728,9 +728,17 @@ void findVector(std::string from_ent, std::string to_ent, Freddy *rob, double *v
   double *to_s = new double[6]{};
 
   getLinkSFromRob(from_ent, rob, from_s);
+
+  printf("from_s: %s: %f %f %f %f %f %f\n", from_ent.c_str(), from_s[0], from_s[1],
+         from_s[2], from_s[3], from_s[4], from_s[5]);
+
   getLinkSFromRob(to_ent, rob, to_s);
 
-  for (size_t i = 0; i < sizeof(vec) / sizeof(vec[0]); i++)
+  printf("to_s: %s: %f %f %f %f %f %f\n", to_ent.c_str(), to_s[0], to_s[1], to_s[2],
+         to_s[3], to_s[4], to_s[5]);
+
+  // TODO: dont use hardcoded values
+  for (size_t i = 0; i < 3; i++)
   {
     vec[i] = to_s[i] - from_s[i];
   }
@@ -739,13 +747,14 @@ void findVector(std::string from_ent, std::string to_ent, Freddy *rob, double *v
 void findNormalizedVector(const double *vec, double *normalized_vec)
 {
   double norm = 0.0;
-  for (size_t i = 0; i < sizeof(vec) / sizeof(vec[0]); i++)
+  // TODO: dont use hardcoded values
+  for (size_t i = 0; i < 3; i++)
   {
     norm += vec[i] * vec[i];
   }
   norm = sqrt(norm);
 
-  for (size_t i = 0; i < sizeof(vec) / sizeof(vec[0]); i++)
+  for (size_t i = 0; i < 3; i++)
   {
     normalized_vec[i] = vec[i] / norm;
   }
@@ -756,6 +765,9 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
 {
   double *dir_vec = new double[3]{};
   findVector(from_ent, to_ent, rob, dir_vec);
+
+  std::cout << "dir_vec_p: " << dir_vec[0] << " " << dir_vec[1] << " " << dir_vec[2]
+            << std::endl;
 
   if (asb_ent != "base_link")
   {
@@ -868,7 +880,7 @@ void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent,
     wrench_kdl(i) = wrench[i];
   }
 
-  KDL::Wrench transformed_wrench_kdl = frame * wrench_kdl;
+  KDL::Wrench transformed_wrench_kdl = frame.Inverse() * wrench_kdl;
 
   for (size_t i = 0; i < 6; i++)
   {
@@ -935,6 +947,17 @@ void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string tar
 
   fk_solver_pos.JntToCart(q, frame);
 
+  // print the rpy values
+  KDL::Rotation rot = frame.M;
+  double roll, pitch, yaw;
+  rot.GetRPY(roll, pitch, yaw);
+  // convert to degrees
+  roll = RAD2DEG(roll);
+  pitch = RAD2DEG(pitch);
+  yaw = RAD2DEG(yaw);
+
+  std::cout << "roll: " << roll << " pitch: " << pitch << " yaw: " << yaw << std::endl;
+
   KDL::Jacobian alpha_jac(nc);
   for (size_t i = 0; i < nc; i++)
   {
@@ -946,7 +969,7 @@ void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string tar
 
   for (size_t i = 0; i < nc; i++)
   {
-    alpha_jac.setColumn(i, frame * alpha_jac.getColumn(i));
+    alpha_jac.setColumn(i, frame.Inverse() * alpha_jac.getColumn(i));
   }
 
   for (size_t i = 0; i < nc; i++)
@@ -963,7 +986,7 @@ void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string tar
     beta_acc_twist(i) = beta[i];
   }
 
-  KDL::Twist transformed_beta_acc_twist = frame * beta_acc_twist;
+  KDL::Twist transformed_beta_acc_twist = frame.Inverse() * beta_acc_twist;
 
   for (size_t i = 0; i < 6; i++)
   {
