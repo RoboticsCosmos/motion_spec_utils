@@ -61,7 +61,6 @@
 #include "kinova_mediator/mediator.hpp"
 #include "motion_spec_utils/robot_structs.hpp"
 
-
 /**
  * @brief Initializes the robot state struct.
  * @param num_joints The number of joints.
@@ -71,7 +70,17 @@
 void initialize_manipulator_state(int num_joints, int num_segments,
                                   ManipulatorState *rob);
 
+void free_manipulator_state(ManipulatorState *rob);
+
 void initialize_mobile_base_state(MobileBaseState *base);
+
+void free_mobile_base_state(MobileBaseState *base);
+
+void free_manipulator(Manipulator<kinova_mediator> *rob);
+
+void free_mobile_base(MobileBase<Robile> *base);
+
+void free_freddy(Freddy *rob);
 
 /**
  * @brief Initializes the robot state struct.

@@ -26,8 +26,6 @@
 extern "C"
 {
 #include "kelo_motion_control/mediator.h"
-#include "kelo_motion_control/EthercatCommunication.h"
-#include "kelo_motion_control/KeloMotionControl.h"
 }
 
 #include "motion_spec_utils/utils.hpp"
@@ -58,10 +56,61 @@ void initialize_manipulator_state(int num_joints, int num_segments, ManipulatorS
   rob->f_tool_measured = new double[6]{};
 }
 
+void free_manipulator_state(ManipulatorState *rob)
+{
+  delete[] rob->q;
+  delete[] rob->q_dot;
+  delete[] rob->q_ddot;
+
+  for (size_t i = 0; i < rob->ns; i++)
+  {
+    delete[] rob->s[i];
+    delete[] rob->s_dot[i];
+    delete[] rob->s_ddot[i];
+  }
+
+  delete[] rob->s;
+  delete[] rob->s_dot;
+  delete[] rob->s_ddot;
+
+  delete[] rob->tau_command;
+  delete[] rob->tau_measured;
+  delete[] rob->f_tool_command;
+  delete[] rob->f_tool_measured;
+}
+
 void initialize_mobile_base_state(MobileBaseState *base)
 {
   base->pivot_angles = new double[4]{};
   base->tau_command = new double[8]{};
+}
+
+void free_mobile_base_state(MobileBaseState *base)
+{
+  delete[] base->pivot_angles;
+  delete[] base->tau_command;
+}
+
+void free_manipulator(Manipulator<kinova_mediator> *rob)
+{
+  free_manipulator_state(rob->state);
+  delete rob->mediator;
+}
+
+void free_mobile_base(MobileBase<Robile> *base)
+{
+  free_mobile_base_state(base->state);
+  delete base->mediator->ethercat_config;
+  delete[] base->mediator->kelo_base_config->index_to_EtherCAT;
+  delete[] base->mediator->kelo_base_config->wheel_coordinates;
+  delete[] base->mediator->kelo_base_config->pivot_angles_deviation;
+}
+
+void free_freddy(Freddy *rob)
+{
+  free_manipulator(rob->kinova_left);
+  free_manipulator(rob->kinova_right);
+  free_mobile_base(rob->mobile_base);
 }
 
 void initialize_robot(std::string robot_urdf, Freddy *freddy)
@@ -131,6 +180,7 @@ void initialize_robot_sim(std::string robot_urdf, Freddy *freddy)
   if (!kdl_parser::treeFromFile(robot_urdf, freddy->tree))
   {
     std::cerr << "Failed to construct KDL tree" << std::endl;
+    exit(1);
   }
 
   std::cout << "Successfully initialized robot tree" << std::endl;
@@ -143,17 +193,8 @@ void initialize_robot_sim(std::string robot_urdf, Freddy *freddy)
                              freddy->kinova_left->chain))
   {
     std::cerr << "Failed to get chain from KDL tree" << std::endl;
+    exit(1);
   }
-
-  // print the chain
-  std::cout << "Kinova left chain: " << std::endl;
-  for (int i = 0; i < freddy->kinova_left->chain.getNrOfSegments(); i++)
-  {
-    std::cout << freddy->kinova_left->chain.getSegment(i).getName() << std::endl;
-  }
-  std::cout << "number of joints: " << freddy->kinova_left->chain.getNrOfJoints()
-            << std::endl;
-  std::cout << std::endl;
 
   // right arm
   if (!freddy->tree.getChain(base_link, freddy->kinova_right->tool_frame,
@@ -173,24 +214,7 @@ void initialize_robot_sim(std::string robot_urdf, Freddy *freddy)
                                freddy->kinova_right->chain.getNrOfSegments(),
                                freddy->kinova_right->state);
 
-  // initialize_mobile_base_state(freddy->mobile_base->state);
-  freddy->mobile_base->state->pivot_angles = new double[4]{};
-  freddy->mobile_base->state->tau_command = new double[8]{};
-
-  std::cout << "Successfully initialized robot states" << std::endl;
-
-  // int nWheels = 4;
-  // int index_to_EtherCAT[4] = {3, 5, 7, 9};
-  // double radius = 0.052;
-  // double castor_offset = 0.01;
-  // double half_wheel_distance = 0.0275;
-  // double wheel_coordinates[8] = {0.175,  0.1605,  -0.175, 0.1605,
-  //                                -0.175, -0.1605, 0.175,  -0.1605};  //
-  //                                x1,y1,x2,y2,..,y4
-  // double pivot_angles_deviation[4] = {-2.5, -1.25, -2.14, 1.49};
-  // init_kelo_base_config(freddy->mobile_base->mediator->kelo_base_config, nWheels,
-  //                       index_to_EtherCAT, radius, castor_offset, half_wheel_distance,
-  //                       wheel_coordinates, pivot_angles_deviation);
+  initialize_mobile_base_state(freddy->mobile_base->state);
 
   std::cout << "Successfully initialized robot" << std::endl;
 }
@@ -480,52 +504,24 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
   }
 }
 
-void base_fd_solver(Freddy *rob, double *platform_force1, double *wheel_torques1)
+void base_fd_solver(Freddy *rob, double *platform_forces, double *wheel_torques)
 {
-  int nWheels = 4;
-  int index_to_EtherCAT[4] = {3, 5, 7, 9};
-  double radius = 0.052;
-  double castor_offset = 0.01;
-  double half_wheel_distance = 0.0275;
-  double wheel_coordinates[8] = {0.175,  0.1605,  -0.175, 0.1605,
-                                 -0.175, -0.1605, 0.175,  -0.1605};  // x1,y1,x2,y2,..,y4
-  double pivot_angles_deviation[4] = {-2.5, -1.25, -2.14, 1.49};
-  KeloBaseConfig kelo_base_config;
-  init_kelo_base_config(&kelo_base_config, nWheels, index_to_EtherCAT, radius,
-                        castor_offset, half_wheel_distance, wheel_coordinates,
-                        pivot_angles_deviation);
-
   const unsigned int N = 3;
-  const unsigned int M = 8;
+  const unsigned int M = rob->mobile_base->mediator->kelo_base_config->nWheels * 2;
 
   TorqueControlState *torque_control_state = new TorqueControlState();
   init_torque_control_state(torque_control_state, N, M);
 
-  double platform_force[3] = {0.0, 0.0, 10.0};
-  set_platform_force(torque_control_state, platform_force, N);
-
-  double pivot_angles[4] = {0.0, 0.0, 0.0, 0.0};
-  double wheel_torques[8] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+  set_platform_force(torque_control_state, platform_forces, N);
 
   set_weight_matrix(torque_control_state, N, M);
 
-  int counter = 0;
-  while (counter < 1)
-  {
-    printf("Counter: %d\n", counter);
-    compute_wheel_torques(&kelo_base_config, torque_control_state, pivot_angles,
-                          wheel_torques, N, M);
-    printf("Wheel torques: ");
-    for (size_t i = 0; i < M; i++)
-    {
-      printf("%f ", wheel_torques[i]);
-    }
-    printf("\n");
-    counter++;
-  }
+  compute_wheel_torques(rob->mobile_base->mediator->kelo_base_config,
+                        torque_control_state, rob->mobile_base->state->pivot_angles,
+                        wheel_torques, N, M);
 
   free_torque_control_state(torque_control_state);
-  free(torque_control_state);
+  delete torque_control_state;
 }
 
 template <typename MediatorType>

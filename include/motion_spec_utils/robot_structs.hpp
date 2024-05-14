@@ -32,7 +32,7 @@ struct Manipulator
   std::string base_frame;
   std::string tool_frame;
 
-  KDL::Chain chain;
+  KDL::Chain chain = KDL::Chain();
 };
 
 typedef Manipulator<kinova_mediator> KinovaManipulator;
