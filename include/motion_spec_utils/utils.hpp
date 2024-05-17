@@ -92,7 +92,7 @@ void free_robot_data(Freddy *rob);
 // void initialize_robot_state(int num_joints, int num_segments, double *init_q,
 //                             Manipulator *rob);
 
-void initialize_robot(std::string robot_urdf, Freddy *freddy);
+void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy);
 
 void initialize_robot_sim(std::string robot_urdf, Freddy *freddy);
 
@@ -160,7 +160,7 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
 void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
                       double *ext_wrench_tool, double *constraint_tau);
 
-void rne_solver(ManipulatorState *rob, KDL::Chain *chain, double *root_acceleration,
+void rne_solver(Freddy *rob, std::string root_link, std::string tip_link, double *root_acceleration,
                 double **ext_wrench, double *constraint_tau);
 
 void base_fd_solver(Freddy *rob, double *platform_force, double *wheel_torques);
@@ -173,8 +173,10 @@ void get_manipulator_data(Manipulator<MediatorType> *rob);
 void update_manipulator_state(ManipulatorState *state, std::string tool_frame,
                               KDL::Tree *tree);
 
-void set_manipulator_torques(Freddy *rob, std::string root_link, std::string tip_link,
-                             double *tau_command);
+void cap_and_convert_torques(double *tau_command, int num_joints, KDL::JntArray &tau_jnt);
+
+void set_manipulator_torques(Freddy *rob, std::string root_link,
+                             KDL::JntArray *tau_command);
 
 void set_mobile_base_torques(Freddy *rob, double *tau_command);
 
@@ -188,7 +190,7 @@ void getLinkForce(std::string applied_by, std::string applied_to, std::string as
 
 void getLinkVelocity(std::string link_name, std::string as_seen_by,
                      std::string with_respect_to, double *vec, Freddy *rob,
-                     double out_twist);
+                     double &out_twist);
 
 void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain,
                      int &link_id);
@@ -202,6 +204,8 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
 
 void get_robot_data(Freddy *rob);
 
+void print_robot_data(Freddy *rob);
+
 void get_robot_data_sim(Freddy *freddy);
 
 void set_init_sim_data(Freddy *freddy);
@@ -212,5 +216,13 @@ void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string tar
 
 void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent,
                       double *wrench, double *transformed_wrench);
+
+void achd_solver_manipulator(Manipulator<kinova_mediator> *rob,
+                 int num_constraints, double *root_acceleration, double **alpha,
+                 double *beta, double *tau_ff, double *predicted_acc,
+                 double *constraint_tau);
+
+void rne_solver_manipulator(Manipulator<kinova_mediator> *rob, double *root_acceleration,
+                double **ext_wrench, double *constraint_tau);
 
 #endif  // UTILS_HPP
