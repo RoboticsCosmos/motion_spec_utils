@@ -153,7 +153,7 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
 
   // initialize the mediators
   int r = 0;
-  freddy->kinova_left->mediator->initialize(0, 0, 0.0);
+  // freddy->kinova_left->mediator->initialize(0, 0, 0.0);
   // r = freddy->kinova_left->mediator->set_control_mode(2);
 
   // if (r != 0)
@@ -282,8 +282,8 @@ void updateQandQdot(double *q_ddot, double dt, ManipulatorState *rob)
   }
 }
 
-void rne_solver(Freddy *rob, std::string root_link, std::string tip_link, double *root_acceleration,
-                double **ext_wrench, double *constraint_tau)
+void rne_solver(Freddy *rob, std::string root_link, std::string tip_link,
+                double *root_acceleration, double **ext_wrench, double *constraint_tau)
 {
   // create a chain from the root_link to the tip_link
   KDL::Chain chain;
@@ -355,7 +355,7 @@ void rne_solver(Freddy *rob, std::string root_link, std::string tip_link, double
 }
 
 void rne_solver_manipulator(Manipulator<kinova_mediator> *rob, double *root_acceleration,
-                double **ext_wrench, double *constraint_tau)
+                            double **ext_wrench, double *constraint_tau)
 {
   // create a chain from the root_link to the tip_link
   KDL::Chain chain = rob->chain;
@@ -580,6 +580,17 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
   // constraint torques
   KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob_state->nj);
 
+  // print all the inputs
+  std::cout << "achd inputs: " << std::endl;
+  std::cout << "root acceleration: " << root_acc.vel(0) << " " << root_acc.vel(1) << " "
+            << root_acc.vel(2) << " " << root_acc.rot(0) << " " << root_acc.rot(1) << " "
+            << root_acc.rot(2) << std::endl;
+  std::cout << "alpha: \n" << alpha_jac << std::endl;
+  std::cout << "beta: " << beta_jnt << std::endl;
+  std::cout << "q: " << q << std::endl;
+  std::cout << "qd: " << qd << std::endl;
+  std::cout << "ff_tau: " << ff_tau_jnt << std::endl;
+
   int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext,
                                         ff_tau_jnt, constraint_tau_jnt);
 
@@ -596,10 +607,10 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
   }
 }
 
-void achd_solver_manipulator(Manipulator<kinova_mediator> *rob,
-                 int num_constraints, double *root_acceleration, double **alpha,
-                 double *beta, double *tau_ff, double *predicted_acc,
-                 double *constraint_tau)
+void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constraints,
+                             double *root_acceleration, double **alpha, double *beta,
+                             double *tau_ff, double *predicted_acc,
+                             double *constraint_tau)
 {
   KDL::Chain chain = rob->chain;
   ManipulatorState *rob_state = rob->state;
@@ -759,7 +770,6 @@ void update_manipulator_state(ManipulatorState *state, std::string tool_frame,
     state->s[i][1] = frame_vels[i].GetFrame().p.y();
     state->s[i][2] = frame_vels[i].GetFrame().p.z();
     state->s[i][3] = frame_vels[i].GetFrame().M.GetRot().x();
-    state->s[i][4] = frame_vels[i].GetFrame().M.GetRot().y();
     state->s[i][5] = frame_vels[i].GetFrame().M.GetRot().z();
   }
 }
@@ -791,9 +801,8 @@ void set_manipulator_torques(Freddy *rob, std::string root_link,
                              KDL::JntArray *tau_command)
 {
   // get robot from root link
-  Manipulator<kinova_mediator> *arm = root_link == rob->kinova_left->base_frame
-                                         ? rob->kinova_left
-                                         : rob->kinova_right;
+  Manipulator<kinova_mediator> *arm =
+      root_link == rob->kinova_left->base_frame ? rob->kinova_left : rob->kinova_right;
 
   // send the torques to the robot
   int r = arm->mediator->set_joint_torques(*tau_command);
@@ -1074,6 +1083,235 @@ void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent,
   }
 }
 
+void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
+                     std::string source_frame, std::string target_frame,
+                     double **alpha, int nc, double **transformed_alpha)
+{
+  KDL::Chain chain;
+  if (!tree->getChain(source_frame, target_frame, chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+    return;
+  }
+
+  KDL::Frame frame;
+  KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
+
+  KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
+
+  ManipulatorState *rob_state = rob->state;
+
+  bool forward = true;
+  if (source_frame != "base_link" && target_frame == "base_link")
+  {
+    forward = false;
+  }
+
+  if (chain.getNrOfJoints() != 0)
+  {
+    if (forward)
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[i];
+      }
+    }
+    else
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[rob_state->nj - i - 1];
+      }
+    }
+  }
+
+  fk_solver_pos.JntToCart(q, frame);
+
+  KDL::Jacobian alpha_jac(nc);
+  for (size_t i = 0; i < nc; i++)
+  {
+    for (size_t j = 0; j < 6; j++)
+    {
+      alpha_jac(j, i) = alpha[i][j];
+    }
+  }
+
+  for (size_t i = 0; i < nc; i++)
+  {
+    alpha_jac.setColumn(i, frame.M * alpha_jac.getColumn(i));
+  }
+
+  for (size_t i = 0; i < nc; i++)
+  {
+    for (size_t j = 0; j < 6; j++)
+    {
+      transformed_alpha[i][j] = alpha_jac(j, i);
+    }
+  }
+}
+
+void transform_alpha_beta(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
+                          std::string source_frame, std::string target_frame,
+                          double **alpha, double *beta, int nc,
+                          double **transformed_alpha, double *transformed_beta)
+{
+  KDL::Chain chain;
+  if (!tree->getChain(source_frame, target_frame, chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+    return;
+  }
+
+  KDL::Frame frame;
+  KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
+
+  KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
+
+  ManipulatorState *rob_state = rob->state;
+
+  bool forward = true;
+  if (source_frame != "base_link" && target_frame == "base_link")
+  {
+    forward = false;
+  }
+
+  if (chain.getNrOfJoints() != 0)
+  {
+    if (forward)
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[i];
+      }
+    }
+    else
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[rob_state->nj - i - 1];
+      }
+    }
+  }
+
+  fk_solver_pos.JntToCart(q, frame);
+
+  KDL::Jacobian alpha_jac(nc);
+  for (size_t i = 0; i < nc; i++)
+  {
+    for (size_t j = 0; j < 6; j++)
+    {
+      alpha_jac(j, i) = alpha[i][j];
+    }
+  }
+
+  for (size_t i = 0; i < nc; i++)
+  {
+    alpha_jac.setColumn(i, frame.M * alpha_jac.getColumn(i));
+  }
+
+  for (size_t i = 0; i < nc; i++)
+  {
+    for (size_t j = 0; j < 6; j++)
+    {
+      transformed_alpha[i][j] = alpha_jac(j, i);
+    }
+  }
+
+  KDL::Twist beta_acc_twist;
+  for (size_t i = 0; i < 6; i++)
+  {
+    beta_acc_twist(i) = beta[i];
+  }
+
+  KDL::Twist transformed_beta_acc_twist = frame.M * beta_acc_twist;
+
+  for (size_t i = 0; i < 6; i++)
+  {
+    transformed_beta[i] = transformed_beta_acc_twist(i);
+  }
+}
+
+void transform_alpha(Freddy *rob, std::string source_frame, std::string target_frame,
+                     double **alpha, int nc, double **transformed_alpha)
+{
+  KDL::Chain chain;
+  if (!rob->tree.getChain(source_frame, target_frame, chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+    return;
+  }
+
+  KDL::Frame frame;
+  KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
+
+  KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
+
+  // update q values from the robot state
+  bool is_in_left_chain, is_in_right_chain = false;
+
+  std::string not_base_link = source_frame == "base_link" ? target_frame : source_frame;
+  int link_id = -1;
+  findLinkInChain(not_base_link, &rob->kinova_left->chain, is_in_left_chain, link_id);
+  findLinkInChain(not_base_link, &rob->kinova_right->chain, is_in_right_chain, link_id);
+
+  if (!is_in_left_chain && !is_in_right_chain)
+  {
+    std::cerr << "Link not found in the robot chains" << std::endl;
+    return;
+  }
+
+  ManipulatorState *rob_state =
+      is_in_left_chain ? rob->kinova_left->state : rob->kinova_right->state;
+
+  bool forward = true;
+  if (source_frame != "base_link" && target_frame == "base_link")
+  {
+    forward = false;
+  }
+
+  if (chain.getNrOfJoints() != 0)
+  {
+    if (forward)
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[i];
+      }
+    }
+    else
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[rob_state->nj - i - 1];
+      }
+    }
+  }
+
+  fk_solver_pos.JntToCart(q, frame);
+
+  KDL::Jacobian alpha_jac(nc);
+  for (size_t i = 0; i < nc; i++)
+  {
+    for (size_t j = 0; j < 6; j++)
+    {
+      alpha_jac(j, i) = alpha[i][j];
+    }
+  }
+
+  for (size_t i = 0; i < nc; i++)
+  {
+    alpha_jac.setColumn(i, frame.M * alpha_jac.getColumn(i));
+  }
+
+  for (size_t i = 0; i < nc; i++)
+  {
+    for (size_t j = 0; j < 6; j++)
+    {
+      transformed_alpha[i][j] = alpha_jac(j, i);
+    }
+  }
+}
+
 void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string target_frame,
                           double **alpha, double *beta, int nc,
                           double **transformed_alpha, double *transformed_beta)
@@ -1144,7 +1382,7 @@ void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string tar
 
   for (size_t i = 0; i < nc; i++)
   {
-    alpha_jac.setColumn(i, frame.Inverse() * alpha_jac.getColumn(i));
+    alpha_jac.setColumn(i, frame.M * alpha_jac.getColumn(i));
   }
 
   for (size_t i = 0; i < nc; i++)
@@ -1161,7 +1399,7 @@ void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string tar
     beta_acc_twist(i) = beta[i];
   }
 
-  KDL::Twist transformed_beta_acc_twist = frame.Inverse() * beta_acc_twist;
+  KDL::Twist transformed_beta_acc_twist = frame.M * beta_acc_twist;
 
   for (size_t i = 0; i < 6; i++)
   {
@@ -1171,9 +1409,9 @@ void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string tar
 
 void get_robot_data(Freddy *freddy)
 {
-  get_manipulator_data(freddy->kinova_left);
-  update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
-                           &freddy->tree);
+  // get_manipulator_data(freddy->kinova_left);
+  // update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
+  //                          &freddy->tree);
 
   get_manipulator_data(freddy->kinova_right);
   update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
@@ -1186,53 +1424,53 @@ void get_robot_data(Freddy *freddy)
 
 void print_robot_data(Freddy *rob)
 {
-  std::cout << "Left arm state: " << std::endl;
-  std::cout << "-- q: ";
-  for (size_t i = 0; i < rob->kinova_left->state->nj; i++)
-  {
-    std::cout << rob->kinova_left->state->q[i] << " ";
-  }
-  std::cout << std::endl;
-  std::cout << "-- tool pose: ";
-  for (size_t i = 0; i < 6; i++)
-  {
-    std::cout << rob->kinova_left->state->s[rob->kinova_left->state->ns - 1][i] << " ";
-  }
-  std::cout << std::endl;
-  std::cout << "-- tool twist: ";
-  for (size_t i = 0; i < 6; i++)
-  {
-    std::cout << rob->kinova_left->state->s_dot[rob->kinova_left->state->ns - 1][i]
-              << " ";
-  }
-  std::cout << std::endl;
-  std::cout << "-- measured torque: ";
-  for (size_t i = 0; i < rob->kinova_left->state->nj; i++)
-  {
-    std::cout << rob->kinova_left->state->tau_measured[i] << " ";
-  }
-  std::cout << std::endl;
-
-  // std::cout << "Right arm state: " << std::endl;
+  // std::cout << "Left arm state: " << std::endl;
   // std::cout << "-- q: ";
-  // for (size_t i = 0; i < rob->kinova_right->state->nj; i++)
+  // for (size_t i = 0; i < rob->kinova_left->state->nj; i++)
   // {
-  //   std::cout << rob->kinova_right->state->q[i] << " ";
+  //   std::cout << rob->kinova_left->state->q[i] << " ";
   // }
   // std::cout << std::endl;
   // std::cout << "-- tool pose: ";
   // for (size_t i = 0; i < 6; i++)
   // {
-  //   std::cout << rob->kinova_right->state->s[rob->kinova_right->state->ns - 1][i] << " ";
+  //   std::cout << rob->kinova_left->state->s[rob->kinova_left->state->ns - 1][i] << " ";
   // }
   // std::cout << std::endl;
   // std::cout << "-- tool twist: ";
   // for (size_t i = 0; i < 6; i++)
   // {
-  //   std::cout << rob->kinova_right->state->s_dot[rob->kinova_right->state->ns - 1][i]
+  //   std::cout << rob->kinova_left->state->s_dot[rob->kinova_left->state->ns - 1][i]
   //             << " ";
   // }
   // std::cout << std::endl;
+  // std::cout << "-- measured torque: ";
+  // for (size_t i = 0; i < rob->kinova_left->state->nj; i++)
+  // {
+  //   std::cout << rob->kinova_left->state->tau_measured[i] << " ";
+  // }
+  // std::cout << std::endl;
+
+  std::cout << "Right arm state: " << std::endl;
+  std::cout << "-- q: ";
+  for (size_t i = 0; i < rob->kinova_right->state->nj; i++)
+  {
+    std::cout << rob->kinova_right->state->q[i] << " ";
+  }
+  std::cout << std::endl;
+  std::cout << "-- tool pose: ";
+  for (size_t i = 0; i < 6; i++)
+  {
+    std::cout << rob->kinova_right->state->s[rob->kinova_right->state->ns - 1][i] << " ";
+  }
+  std::cout << std::endl;
+  std::cout << "-- tool twist: ";
+  for (size_t i = 0; i < 6; i++)
+  {
+    std::cout << rob->kinova_right->state->s_dot[rob->kinova_right->state->ns - 1][i]
+              << " ";
+  }
+  std::cout << std::endl;
 
   // std::cout << "Mobile base state: " << std::endl;
   // std::cout << "-- pivot angles: ";

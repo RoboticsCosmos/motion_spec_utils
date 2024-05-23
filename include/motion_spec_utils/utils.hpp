@@ -160,8 +160,8 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
 void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
                       double *ext_wrench_tool, double *constraint_tau);
 
-void rne_solver(Freddy *rob, std::string root_link, std::string tip_link, double *root_acceleration,
-                double **ext_wrench, double *constraint_tau);
+void rne_solver(Freddy *rob, std::string root_link, std::string tip_link,
+                double *root_acceleration, double **ext_wrench, double *constraint_tau);
 
 void base_fd_solver(Freddy *rob, double *platform_force, double *wheel_torques);
 
@@ -210,6 +210,18 @@ void get_robot_data_sim(Freddy *freddy);
 
 void set_init_sim_data(Freddy *freddy);
 
+void transform_alpha(Freddy *rob, std::string source_frame, std::string target_frame,
+                     double **alpha, int nc, double **transformed_alpha);
+
+void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
+                     std::string source_frame, std::string target_frame,
+                     double **alpha, int nc, double **transformed_alpha);
+
+void transform_alpha_beta(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
+                          std::string source_frame, std::string target_frame,
+                          double **alpha, double *beta, int nc,
+                          double **transformed_alpha, double *transformed_beta);
+
 void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string target_frame,
                           double **alpha, double *beta, int nc,
                           double **transformed_alpha, double *transformed_beta);
@@ -217,12 +229,12 @@ void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string tar
 void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent,
                       double *wrench, double *transformed_wrench);
 
-void achd_solver_manipulator(Manipulator<kinova_mediator> *rob,
-                 int num_constraints, double *root_acceleration, double **alpha,
-                 double *beta, double *tau_ff, double *predicted_acc,
-                 double *constraint_tau);
+void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constraints,
+                             double *root_acceleration, double **alpha, double *beta,
+                             double *tau_ff, double *predicted_acc,
+                             double *constraint_tau);
 
 void rne_solver_manipulator(Manipulator<kinova_mediator> *rob, double *root_acceleration,
-                double **ext_wrench, double *constraint_tau);
+                            double **ext_wrench, double *constraint_tau);
 
 #endif  // UTILS_HPP
