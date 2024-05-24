@@ -206,7 +206,11 @@ void get_robot_data(Freddy *rob);
 
 void print_robot_data(Freddy *rob);
 
-void get_robot_data_sim(Freddy *freddy);
+void get_manipulator_data_sim(Manipulator<kinova_mediator> *rob, double *param_type,
+                              double time_step);
+
+void get_robot_data_sim(Freddy *freddy, double *kinova_left_predicted_acc,
+                        double *kinova_right_predicted_acc, double time_step);
 
 void set_init_sim_data(Freddy *freddy);
 
@@ -214,8 +218,8 @@ void transform_alpha(Freddy *rob, std::string source_frame, std::string target_f
                      double **alpha, int nc, double **transformed_alpha);
 
 void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
-                     std::string source_frame, std::string target_frame,
-                     double **alpha, int nc, double **transformed_alpha);
+                     std::string source_frame, std::string target_frame, double **alpha,
+                     int nc, double **transformed_alpha);
 
 void transform_alpha_beta(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
                           std::string source_frame, std::string target_frame,

@@ -30,6 +30,8 @@ extern "C"
 
 #include "motion_spec_utils/utils.hpp"
 
+#include "kdl/frames_io.hpp"
+
 void initialize_manipulator_state(int num_joints, int num_segments, ManipulatorState *rob)
 {
   rob->nj = num_joints;
@@ -171,18 +173,18 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
   //   exit(1);
   // }
 
-  init_ecx_context(freddy->mobile_base->mediator->ethercat_config);
+  // init_ecx_context(freddy->mobile_base->mediator->ethercat_config);
 
-  int result = 0;
-  establish_kelo_base_connection(freddy->mobile_base->mediator->kelo_base_config,
-                                 freddy->mobile_base->mediator->ethercat_config,
-                                 interface, &result);
+  // int result = 0;
+  // establish_kelo_base_connection(freddy->mobile_base->mediator->kelo_base_config,
+  //                                freddy->mobile_base->mediator->ethercat_config,
+  //                                interface, &result);
 
-  if (result != 0)
-  {
-    std::cerr << "Failed to establish connection with the mobile base" << std::endl;
-    exit(1);
-  }
+  // if (result != 0)
+  // {
+  //   std::cerr << "Failed to establish connection with the mobile base" << std::endl;
+  //   exit(1);
+  // }
 
   std::cout << "Successfully initialized robot" << std::endl;
 }
@@ -195,8 +197,6 @@ void initialize_robot_sim(std::string robot_urdf, Freddy *freddy)
     std::cerr << "Failed to construct KDL tree" << std::endl;
     exit(1);
   }
-
-  std::cout << "Successfully initialized robot tree" << std::endl;
 
   // *Assumption* - base_link is the root link
   std::string base_link = "base_link";
@@ -215,8 +215,6 @@ void initialize_robot_sim(std::string robot_urdf, Freddy *freddy)
   {
     std::cerr << "Failed to get chain from KDL tree" << std::endl;
   }
-
-  std::cout << "Successfully initialized robot chains" << std::endl;
 
   // initialize the states
   initialize_manipulator_state(freddy->kinova_left->chain.getNrOfJoints(),
@@ -506,7 +504,7 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
   KDL::Chain chain;
   if (!rob->tree.getChain(root_link, tip_link, chain))
   {
-    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+    std::cerr << "[achd] Failed to get chain from KDL tree" << std::endl;
   }
 
   // get the corresponding robot state
@@ -581,10 +579,8 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
   KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob_state->nj);
 
   // print all the inputs
-  std::cout << "achd inputs: " << std::endl;
-  std::cout << "root acceleration: " << root_acc.vel(0) << " " << root_acc.vel(1) << " "
-            << root_acc.vel(2) << " " << root_acc.rot(0) << " " << root_acc.rot(1) << " "
-            << root_acc.rot(2) << std::endl;
+  std::cout << "\nachd inputs: " << std::endl;
+  std::cout << "root acceleration: " << root_acc << std::endl;
   std::cout << "alpha: \n" << alpha_jac << std::endl;
   std::cout << "beta: " << beta_jnt << std::endl;
   std::cout << "q: " << q << std::endl;
@@ -599,6 +595,28 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
     std::cerr << "[achd] Failed to solve the hybrid dynamics problem" << std::endl;
     std::cerr << "[achd] Error code: " << r << std::endl;
   }
+
+  std::vector<KDL::Twist> twists(7);
+  vereshchagin_solver.getLinkCartesianAcceleration(twists);
+
+  KDL::Chain chain_to_base;
+  if (!rob->tree.getChain(root_link, "base_link", chain_to_base))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+  }
+
+  KDL::JntArray q1(0);
+
+  // fk solver
+  KDL::ChainFkSolverPos_recursive fk_solver(chain_to_base);
+  KDL::Frame frame;
+  fk_solver.JntToCart(q1, frame);
+
+  // transform the twist to the base_link frame
+  KDL::Twist tip_twist = twists[6];
+  tip_twist = frame.M * tip_twist;
+
+  std::cout << "-- tool acc: " << tip_twist << std::endl << std::endl;
 
   for (size_t i = 0; i < rob_state->nj; i++)
   {
@@ -674,8 +692,55 @@ void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constrai
   // constraint torques
   KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob_state->nj);
 
+  // print all the inputs
+  std::cout << "achd inputs: " << std::endl;
+  std::cout << "root acceleration: " << root_acc << std::endl;
+  std::cout << "alpha: \n" << alpha_jac << std::endl;
+  std::cout << "beta: " << beta_jnt << std::endl;
+  std::cout << "q: " << q << std::endl;
+  std::cout << "qd: " << qd << std::endl;
+  std::cout << "ff_tau: " << ff_tau_jnt << std::endl;
+
   int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext,
                                         ff_tau_jnt, constraint_tau_jnt);
+
+  std::vector<KDL::Twist> twists(7);
+  vereshchagin_solver.getLinkCartesianAcceleration(twists);
+
+  std::string robot_urdf = "/home/batsy/rc/src/motion_spec_gen/urdf/freddy.urdf";
+
+  KDL::Tree tree1;
+
+  // load the robot urdf
+  if (!kdl_parser::treeFromFile(robot_urdf, tree1))
+  {
+    std::cerr << "Failed to construct KDL tree" << std::endl;
+    exit(1);
+  }
+
+  KDL::Chain chain1;
+  if (!tree1.getChain("base_link", rob->base_frame, chain1))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+  }
+
+  KDL::JntArray q1(0);
+
+  // fk solver
+  KDL::ChainFkSolverPos_recursive fk_solver(chain1);
+  KDL::Frame frame;
+  fk_solver.JntToCart(q1, frame);
+
+  // transform the twist to the base_link frame
+  KDL::Twist tip_twist = twists[6];
+  tip_twist = frame.M.Inverse() * tip_twist;
+
+  // // print
+  // std::cout << "-- tool pose: " << std::endl;
+  // std::cout << frames[6].p.x() << " " << frames[6].p.y() << " " << frames[6].p.z() <<
+  // std::endl;
+
+  std::cout << "-- tool acceleration: " << tip_twist << std::endl;
 
   if (r < 0)
   {
@@ -746,7 +811,7 @@ void update_manipulator_state(ManipulatorState *state, std::string tool_frame,
 
   // update the s_dot values
   KDL::ChainFkSolverVel_recursive fk_solver_vel(*chain);
-  std::vector<KDL::FrameVel> frame_vels(state->ns);
+  std::vector<KDL::FrameVel> frame_vels(chain->getNrOfSegments());
   KDL::JntArrayVel q_dot_kdl(state->nj);
   for (size_t i = 0; i < state->nj; i++)
   {
@@ -755,22 +820,27 @@ void update_manipulator_state(ManipulatorState *state, std::string tool_frame,
   }
   fk_solver_vel.JntToCart(q_dot_kdl, frame_vels);
 
-  for (size_t i = 0; i < state->ns; i++)
+  int additional_links = chain->getNrOfSegments() - state->nj;
+
+  for (size_t i = 0; i < chain->getNrOfSegments(); i++)
   {
+    int frame_vel_index = i;  // + additional_links;
+
     // update the s_dot values
-    state->s_dot[i][0] = frame_vels[i].GetTwist().vel.x();
-    state->s_dot[i][1] = frame_vels[i].GetTwist().vel.y();
-    state->s_dot[i][2] = frame_vels[i].GetTwist().vel.z();
-    state->s_dot[i][3] = frame_vels[i].GetTwist().rot.x();
-    state->s_dot[i][4] = frame_vels[i].GetTwist().rot.y();
-    state->s_dot[i][5] = frame_vels[i].GetTwist().rot.z();
+    state->s_dot[i][0] = frame_vels[frame_vel_index].GetTwist().vel.x();
+    state->s_dot[i][1] = frame_vels[frame_vel_index].GetTwist().vel.y();
+    state->s_dot[i][2] = frame_vels[frame_vel_index].GetTwist().vel.z();
+    state->s_dot[i][3] = frame_vels[frame_vel_index].GetTwist().rot.x();
+    state->s_dot[i][4] = frame_vels[frame_vel_index].GetTwist().rot.y();
+    state->s_dot[i][5] = frame_vels[frame_vel_index].GetTwist().rot.z();
 
     // update the s values
-    state->s[i][0] = frame_vels[i].GetFrame().p.x();
-    state->s[i][1] = frame_vels[i].GetFrame().p.y();
-    state->s[i][2] = frame_vels[i].GetFrame().p.z();
-    state->s[i][3] = frame_vels[i].GetFrame().M.GetRot().x();
-    state->s[i][5] = frame_vels[i].GetFrame().M.GetRot().z();
+    state->s[i][0] = frame_vels[frame_vel_index].GetFrame().p.x();
+    state->s[i][1] = frame_vels[frame_vel_index].GetFrame().p.y();
+    state->s[i][2] = frame_vels[frame_vel_index].GetFrame().p.z();
+    state->s[i][3] = frame_vels[frame_vel_index].GetFrame().M.GetRot().x();
+    state->s[i][4] = frame_vels[frame_vel_index].GetFrame().M.GetRot().y();
+    state->s[i][5] = frame_vels[frame_vel_index].GetFrame().M.GetRot().z();
   }
 }
 
@@ -1075,7 +1145,7 @@ void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent,
     wrench_kdl(i) = wrench[i];
   }
 
-  KDL::Wrench transformed_wrench_kdl = frame.Inverse() * wrench_kdl;
+  KDL::Wrench transformed_wrench_kdl = frame * wrench_kdl;
 
   for (size_t i = 0; i < 6; i++)
   {
@@ -1084,8 +1154,8 @@ void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent,
 }
 
 void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
-                     std::string source_frame, std::string target_frame,
-                     double **alpha, int nc, double **transformed_alpha)
+                     std::string source_frame, std::string target_frame, double **alpha,
+                     int nc, double **transformed_alpha)
 {
   KDL::Chain chain;
   if (!tree->getChain(source_frame, target_frame, chain))
@@ -1417,9 +1487,9 @@ void get_robot_data(Freddy *freddy)
   update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
                            &freddy->tree);
 
-  get_kelo_base_state(freddy->mobile_base->mediator->kelo_base_config,
-                      freddy->mobile_base->mediator->ethercat_config,
-                      freddy->mobile_base->state->pivot_angles);
+  // get_kelo_base_state(freddy->mobile_base->mediator->kelo_base_config,
+  //                     freddy->mobile_base->mediator->ethercat_config,
+  //                     freddy->mobile_base->state->pivot_angles);
 }
 
 void print_robot_data(Freddy *rob)
@@ -1472,6 +1542,28 @@ void print_robot_data(Freddy *rob)
   }
   std::cout << std::endl;
 
+  // std::cout << "Right arm state: " << std::endl;
+  // std::cout << "-- q: ";
+  // for (size_t i = 0; i < rob->kinova_right->state->nj; i++)
+  // {
+  //   std::cout << rob->kinova_right->state->q[i] << " ";
+  // }
+  // std::cout << std::endl;
+  // std::cout << "-- tool pose: ";
+  // for (size_t i = 0; i < 6; i++)
+  // {
+  //   std::cout << rob->kinova_right->state->s[rob->kinova_right->state->ns - 1][i] << "
+  //   ";
+  // }
+  // std::cout << std::endl;
+  // std::cout << "-- tool twist: ";
+  // for (size_t i = 0; i < 6; i++)
+  // {
+  //   std::cout << rob->kinova_right->state->s_dot[rob->kinova_right->state->ns - 1][i]
+  //             << " ";
+  // }
+  // std::cout << std::endl;
+
   // std::cout << "Mobile base state: " << std::endl;
   // std::cout << "-- pivot angles: ";
   // for (size_t i = 0; i < rob->mobile_base->mediator->kelo_base_config->nWheels; i++)
@@ -1481,15 +1573,34 @@ void print_robot_data(Freddy *rob)
   // std::cout << std::endl;
 }
 
-void get_robot_data_sim(Freddy *freddy)
+void get_manipulator_data_sim(Manipulator<kinova_mediator> *rob, double *predicted_acc,
+                              double time_step)
 {
-  // get_manipulator_data(freddy->kinova_left);
-  update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
-                           &freddy->tree);
+  // updated q and q_dot values
+  for (size_t i = 0; i < rob->state->nj; i++)
+  {
+    rob->state->q_dot[i] += time_step * predicted_acc[i];
+    rob->state->q[i] += time_step * rob->state->q_dot[i];
+  }
+}
 
-  // get_manipulator_data(freddy->kinova_right);
-  update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
-                           &freddy->tree);
+void get_robot_data_sim(Freddy *freddy, double *kinova_left_predicted_acc,
+                        double *kinova_right_predicted_acc, double time_step)
+{
+  // check if predicted acc is a nullptr
+  if (kinova_left_predicted_acc != nullptr)
+  {
+    get_manipulator_data_sim(freddy->kinova_left, kinova_left_predicted_acc, time_step);
+    update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
+                             &freddy->tree);
+  }
+
+  if (kinova_right_predicted_acc != nullptr)
+  {
+    get_manipulator_data_sim(freddy->kinova_right, kinova_right_predicted_acc, time_step);
+    update_manipulator_state(freddy->kinova_right->state,
+                             freddy->kinova_right->tool_frame, &freddy->tree);
+  }
 }
 
 void set_init_sim_data(Freddy *freddy)
