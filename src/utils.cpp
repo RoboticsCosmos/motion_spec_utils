@@ -507,6 +507,15 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
     std::cerr << "[achd] Failed to get chain from KDL tree" << std::endl;
   }
 
+  // joint inertias: 
+  const std::vector<double> joint_inertia {0.5580, 0.5580, 0.5580, 0.5580, 0.1389, 0.1389, 0.1389};
+
+  // set joint inertias
+  for (size_t i = 0; i < chain.getNrOfJoints(); i++)
+  {
+    chain.getSegment(i).setJoint().setJointInertia(joint_inertia[i]);
+  }
+
   // get the corresponding robot state
   ManipulatorState *rob_state = nullptr;
 
@@ -579,13 +588,13 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
   KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob_state->nj);
 
   // print all the inputs
-  std::cout << "\nachd inputs: " << std::endl;
-  std::cout << "root acceleration: " << root_acc << std::endl;
-  std::cout << "alpha: \n" << alpha_jac << std::endl;
-  std::cout << "beta: " << beta_jnt << std::endl;
-  std::cout << "q: " << q << std::endl;
-  std::cout << "qd: " << qd << std::endl;
-  std::cout << "ff_tau: " << ff_tau_jnt << std::endl;
+  // std::cout << "\nachd inputs: " << std::endl;
+  // std::cout << "root acceleration: " << root_acc << std::endl;
+  // std::cout << "alpha: \n" << alpha_jac << std::endl;
+  // std::cout << "beta: " << beta_jnt << std::endl;
+  // std::cout << "q: " << q << std::endl;
+  // std::cout << "qd: " << qd << std::endl;
+  // std::cout << "ff_tau: " << ff_tau_jnt << std::endl;
 
   int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext,
                                         ff_tau_jnt, constraint_tau_jnt);
@@ -596,27 +605,35 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
     std::cerr << "[achd] Error code: " << r << std::endl;
   }
 
-  std::vector<KDL::Twist> twists(7);
-  vereshchagin_solver.getLinkCartesianAcceleration(twists);
+  // vs_solver.get_constraint_torque(constraint_tau_jnt);
 
-  KDL::Chain chain_to_base;
-  if (!rob->tree.getChain(root_link, "base_link", chain_to_base))
-  {
-    std::cerr << "Failed to get chain from KDL tree" << std::endl;
-  }
+  // std::vector<KDL::Twist> twists(7);
+  // vereshchagin_solver.getLinkCartesianAcceleration(twists);
 
-  KDL::JntArray q1(0);
+  // KDL::Twist tool_twist = twists[6];
 
-  // fk solver
-  KDL::ChainFkSolverPos_recursive fk_solver(chain_to_base);
-  KDL::Frame frame;
-  fk_solver.JntToCart(q1, frame);
+  // std::vector<KDL::Twist> twists(8);
+  // vs_solver.get_transformed_link_acceleration(twists);
 
-  // transform the twist to the base_link frame
-  KDL::Twist tip_twist = twists[6];
-  tip_twist = frame.M * tip_twist;
+  // std::cout << "-- tool acc b: " << tool_twist << std::endl;
 
-  std::cout << "-- tool acc: " << tip_twist << std::endl << std::endl;
+  // KDL::Chain chain_to_base;
+  // if (!rob->tree.getChain(root_link, "base_link", chain_to_base))
+  // {
+  //   std::cerr << "Failed to get chain from KDL tree" << std::endl;
+  // }
+
+  // KDL::JntArray q1(0);
+
+  // // fk solver
+  // KDL::ChainFkSolverPos_recursive fk_solver(chain_to_base);
+  // KDL::Frame frame;
+  // fk_solver.JntToCart(q1, frame);
+
+  // // transform the twist to the base_link frame
+  // KDL::Twist tip_twist = frame.M.Inverse() * tool_twist;
+
+  // std::cout << "-- tool acc: " << tip_twist << std::endl << std::endl;
 
   for (size_t i = 0; i < rob_state->nj; i++)
   {
@@ -1624,4 +1641,22 @@ void set_init_sim_data(Freddy *freddy)
   freddy->kinova_right->state->q[4] = DEG2RAD(353.82);
   freddy->kinova_right->state->q[5] = DEG2RAD(58.59);
   freddy->kinova_right->state->q[6] = DEG2RAD(75.74);
+}
+
+void print_array(double *arr, int size)
+{
+  std::cout << "[ ";
+  for (size_t i = 0; i < size; i++)
+  {
+    std::cout << arr[i] << " ";
+  }
+  std::cout << "]" << std::endl;
+}
+
+void init_2d_array(double **arr, int rows, int cols)
+{
+  for (size_t i = 0; i < rows; i++)
+  {
+    arr[i] = new double[cols]{};
+  }
 }

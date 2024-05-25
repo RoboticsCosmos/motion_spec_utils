@@ -241,4 +241,8 @@ void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constrai
 void rne_solver_manipulator(Manipulator<kinova_mediator> *rob, double *root_acceleration,
                             double **ext_wrench, double *constraint_tau);
 
+void print_array(double *arr, int size);
+
+void init_2d_array(double **arr, int rows, int cols);
+
 #endif  // UTILS_HPP
