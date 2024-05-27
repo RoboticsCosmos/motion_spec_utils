@@ -935,6 +935,26 @@ void computeDistance(std::string *between_ents, std::string asb, Freddy *rob, do
       sqrt(pow(ent1[0] - ent2[0], 2) + pow(ent1[1] - ent2[1], 2) + pow(ent1[2] - ent2[2], 2));
 }
 
+void computeDistance1D(std::string *between_ents, double *axis, std::string asb, Freddy *rob,
+                       double &distance)
+{
+  double *ent1 = new double[6]{};
+  double *ent2 = new double[6]{};
+
+  getLinkSFromRob(between_ents[0], rob, ent1);
+  getLinkSFromRob(between_ents[1], rob, ent2);
+
+  // *Assumption* - axis-aligned vector
+  for (size_t i = 0; i < 6; i++)
+  {
+    if (axis[i] == 1)
+    {
+      distance = abs(ent1[i] - ent2[i]);
+      return;
+    }
+  }
+}
+
 void getLinkVelocity(std::string link_name, std::string as_seen_by, std::string with_respect_to,
                      double *vec, Freddy *rob, double &out_twist)
 {

@@ -351,6 +351,9 @@ void getLinkSFromRob(std::string link_name, Freddy *rob, double *s);
 
 void computeDistance(std::string *between_ents, std::string asb, Freddy *rob, double &distance);
 
+void computeDistance1D(std::string *between_ents, double *axis, std::string asb, Freddy *rob,
+                       double &distance);
+
 void getLinkForce(std::string applied_by, std::string applied_to, std::string asb, double *vec,
                   Freddy *rob, double &force);
 
