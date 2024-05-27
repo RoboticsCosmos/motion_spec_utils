@@ -32,9 +32,6 @@ extern "C"
 
 #include "kdl/frames_io.hpp"
 
-#include <cmath>
-#include <matplot/matplot.h>
-
 void initialize_manipulator_state(int num_joints, int num_segments, ManipulatorState *rob)
 {
   rob->nj = num_joints;
@@ -895,6 +892,8 @@ int set_manipulator_torques(Freddy *rob, std::string root_link, KDL::JntArray *t
     std::cerr << "Failed to set joint torques for the arm" << std::endl;
     return r;
   }
+
+  return 0;
 }
 
 void getLinkSFromRob(std::string link_name, Freddy *rob, double *s)
@@ -1676,52 +1675,52 @@ void write_control_log_to_open_file(FILE *file, LogControlDataVector &log_data)
   }
 }
 
-void plot_control_log_data(std::vector<LogControlDataVector> &log_data)
-{
-  // plot using matplot++
-  using namespace matplot;
+// void plot_control_log_data(std::vector<LogControlDataVector> &log_data)
+// {
+//   // plot using matplot++
+//   using namespace matplot;
 
-  // 3,3 subplots
-  auto fig = figure();
-  // figure sisze
-  fig->size(1900, 1600);
-  // add prper spacing
-  fig->reactive_mode(true);
-  // increase row spacing
-  tiledlayout(3, 3);
+//   // 3,3 subplots
+//   auto fig = figure();
+//   // figure sisze
+//   fig->size(1900, 1600);
+//   // add prper spacing
+//   fig->reactive_mode(true);
+//   // increase row spacing
+//   tiledlayout(3, 3);
 
-  for (size_t i = 0; i < log_data.size(); i++)
-  {
-    nexttile();
-    const char *title_text = log_data[i].control_variable;
-    // replace _ with space
-    std::string title_text_str(title_text);
-    std::replace(title_text_str.begin(), title_text_str.end(), '_', ' ');
-    title_text = title_text_str.c_str();
+//   for (size_t i = 0; i < log_data.size(); i++)
+//   {
+//     nexttile();
+//     const char *title_text = log_data[i].control_variable;
+//     // replace _ with space
+//     std::string title_text_str(title_text);
+//     std::replace(title_text_str.begin(), title_text_str.end(), '_', ' ');
+//     title_text = title_text_str.c_str();
 
-    // data is a vector of struct
-    // LogControlDataVector
-    // {
-    //   const char* control_variable;
-    //   std::vector<LogControlData> control_data;
-    // plot measured vs reference for the length of the data
-    std::vector<double> measured;
-    std::vector<double> reference;
-    for (size_t j = 0; j < log_data[i].control_data.size(); j++)
-    {
-      measured.push_back(log_data[i].control_data[j].measured_value);
-      reference.push_back(log_data[i].control_data[j].reference_value);
-    }
+//     // data is a vector of struct
+//     // LogControlDataVector
+//     // {
+//     //   const char* control_variable;
+//     //   std::vector<LogControlData> control_data;
+//     // plot measured vs reference for the length of the data
+//     std::vector<double> measured;
+//     std::vector<double> reference;
+//     for (size_t j = 0; j < log_data[i].control_data.size(); j++)
+//     {
+//       measured.push_back(log_data[i].control_data[j].measured_value);
+//       reference.push_back(log_data[i].control_data[j].reference_value);
+//     }
 
-    // overlay the reference and measured values with different colors
-    // plot(reference, "r");
-    // hold(on);
-    plot(measured, "b");
-    // hold(off);
-    title(title_text);
-  }
-  show();
-}
+//     // overlay the reference and measured values with different colors
+//     // plot(reference, "r");
+//     // hold(on);
+//     plot(measured, "b");
+//     // hold(off);
+//     title(title_text);
+//   }
+//   show();
+// }
 
 void appendArrayToStream(std::stringstream &ss, double *arr, size_t size)
 {

@@ -201,86 +201,7 @@ struct LogManipulatorData
   }
 };
 
-struct LogManipulatorDataVector
-{
-  std::vector<LogManipulatorData> log_data;
 
-  const char *log_dir;
-  char *filename;
-  FILE *file;
-
-  // constructor
-  LogManipulatorDataVector(const char *log_dir)
-  {
-    this->log_dir = log_dir;
-
-    // create the filename
-    sprintf(this->filename, "%s/manipulator_log.csv", log_dir);
-
-    // create the file
-    this->file = fopen(this->filename, "w");
-    if (this->file == NULL)
-    {
-      std::cerr << "Error opening file: " << this->filename << std::endl;
-      exit(1);
-    }
-
-    // write the header
-    fprintf(file,
-            "Tool Pose X,Tool Pose Y,Tool Pose Z,Tool Pose R,Tool Pose P,Tool Pose Y,"
-            "Tool Twist X,Tool Twist Y,Tool Twist Z,Tool Twist R,Tool Twist P,Tool Twist Y,"
-            "Elbow Pose X,Elbow Pose Y,Elbow Pose Z,Elbow Pose R,Elbow Pose P,Elbow Pose Y,"
-            "Elbow Twist X,Elbow Twist Y,Elbow Twist Z,Elbow Twist R,Elbow Twist P,Elbow Twist Y,"
-            "F Tool Measured X,F Tool Measured Y,F Tool Measured Z,F Tool Measured R,F Tool "
-            "Measured P,F Tool Measured Y,"
-            "Beta X,Beta Y,Beta Z,Beta R,Beta P,Beta Y,"
-            "Tau Command 1,Tau Command 2,Tau Command 3,Tau Command 4,Tau Command 5,Tau Command "
-            "6,Tau Command 7,"
-            "F Tool Command X,F Tool Command Y,F Tool Command Z,F Tool Command R,F Tool Command "
-            "P,F Tool Command Y\n");
-  }
-
-  // destructor
-  ~LogManipulatorDataVector()
-  {
-    fclose(this->file);
-  }
-
-  void addManipulatorData(Manipulator<kinova_mediator> *rob, double *beta, double *tau_command,
-                          double *f_tool_command, double *q_ddot)
-  {
-    LogManipulatorData data;
-    data.populate(rob, beta, tau_command, f_tool_command, q_ddot);
-    this->log_data.push_back(data);
-
-    if (this->log_data.size() >= 100)
-    {
-      writeToOpenFile();
-    }
-  }
-
-  void writeToOpenFile()
-  {
-    for (size_t i = 0; i < this->log_data.size(); i++)
-    {
-      // append all the data to a string
-      std::stringstream ss;
-      appendArrayToStream(ss, this->log_data[i].tool_pose, 6);
-      appendArrayToStream(ss, this->log_data[i].tool_twist, 6);
-      appendArrayToStream(ss, this->log_data[i].elbow_pose, 6);
-      appendArrayToStream(ss, this->log_data[i].elbow_twist, 6);
-      appendArrayToStream(ss, this->log_data[i].f_tool_measured, 6);
-      appendArrayToStream(ss, this->log_data[i].beta, 6);
-      appendArrayToStream(ss, this->log_data[i].tau_command, 7);
-      appendArrayToStream(ss, this->log_data[i].f_tool_command, 6);
-
-      // write the string to the file
-      fprintf(file, "%s\n", ss.str().c_str());
-    }
-    // clear the data
-    this->log_data.clear();
-  }
-};
 
 struct LogDataMobileBase
 {
@@ -493,5 +414,86 @@ void get_new_folder_name(const char *dir_path, char *name);
 void write_control_log_to_open_file(FILE *file, LogControlDataVector &log_data);
 
 void appendArrayToStream(std::stringstream &ss, double *arr, size_t size);
+
+struct LogManipulatorDataVector
+{
+  std::vector<LogManipulatorData> log_data;
+
+  const char *log_dir;
+  char *filename;
+  FILE *file;
+
+  // constructor
+  LogManipulatorDataVector(const char *log_dir)
+  {
+    this->log_dir = log_dir;
+
+    // create the filename
+    sprintf(this->filename, "%s/manipulator_log.csv", log_dir);
+
+    // create the file
+    this->file = fopen(this->filename, "w");
+    if (this->file == NULL)
+    {
+      std::cerr << "Error opening file: " << this->filename << std::endl;
+      exit(1);
+    }
+
+    // write the header
+    fprintf(file,
+            "Tool Pose X,Tool Pose Y,Tool Pose Z,Tool Pose R,Tool Pose P,Tool Pose Y,"
+            "Tool Twist X,Tool Twist Y,Tool Twist Z,Tool Twist R,Tool Twist P,Tool Twist Y,"
+            "Elbow Pose X,Elbow Pose Y,Elbow Pose Z,Elbow Pose R,Elbow Pose P,Elbow Pose Y,"
+            "Elbow Twist X,Elbow Twist Y,Elbow Twist Z,Elbow Twist R,Elbow Twist P,Elbow Twist Y,"
+            "F Tool Measured X,F Tool Measured Y,F Tool Measured Z,F Tool Measured R,F Tool "
+            "Measured P,F Tool Measured Y,"
+            "Beta X,Beta Y,Beta Z,Beta R,Beta P,Beta Y,"
+            "Tau Command 1,Tau Command 2,Tau Command 3,Tau Command 4,Tau Command 5,Tau Command "
+            "6,Tau Command 7,"
+            "F Tool Command X,F Tool Command Y,F Tool Command Z,F Tool Command R,F Tool Command "
+            "P,F Tool Command Y\n");
+  }
+
+  // destructor
+  ~LogManipulatorDataVector()
+  {
+    fclose(this->file);
+  }
+
+  void addManipulatorData(Manipulator<kinova_mediator> *rob, double *beta, double *tau_command,
+                          double *f_tool_command, double *q_ddot)
+  {
+    LogManipulatorData data;
+    data.populate(rob, beta, tau_command, f_tool_command, q_ddot);
+    this->log_data.push_back(data);
+
+    if (this->log_data.size() >= 100)
+    {
+      writeToOpenFile();
+    }
+  }
+
+  void writeToOpenFile()
+  {
+    for (size_t i = 0; i < this->log_data.size(); i++)
+    {
+      // append all the data to a string
+      std::stringstream ss;
+      appendArrayToStream(ss, this->log_data[i].tool_pose, 6);
+      appendArrayToStream(ss, this->log_data[i].tool_twist, 6);
+      appendArrayToStream(ss, this->log_data[i].elbow_pose, 6);
+      appendArrayToStream(ss, this->log_data[i].elbow_twist, 6);
+      appendArrayToStream(ss, this->log_data[i].f_tool_measured, 6);
+      appendArrayToStream(ss, this->log_data[i].beta, 6);
+      appendArrayToStream(ss, this->log_data[i].tau_command, 7);
+      appendArrayToStream(ss, this->log_data[i].f_tool_command, 6);
+
+      // write the string to the file
+      fprintf(file, "%s\n", ss.str().c_str());
+    }
+    // clear the data
+    this->log_data.clear();
+  }
+};
 
 #endif  // UTILS_HPP
