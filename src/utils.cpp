@@ -32,6 +32,9 @@ extern "C"
 
 #include "kdl/frames_io.hpp"
 
+#include <cmath>
+#include <matplot/matplot.h>
+
 void initialize_manipulator_state(int num_joints, int num_segments, ManipulatorState *rob)
 {
   rob->nj = num_joints;
@@ -230,8 +233,8 @@ void initialize_robot_sim(std::string robot_urdf, Freddy *freddy)
   std::cout << "Successfully initialized robot" << std::endl;
 }
 
-void initialize_robot_chain(std::string robot_urdf, std::string base_link,
-                            std::string tool_link, KDL::Chain &robot_chain)
+void initialize_robot_chain(std::string robot_urdf, std::string base_link, std::string tool_link,
+                            KDL::Chain &robot_chain)
 {
   KDL::Tree robot_tree;
 
@@ -432,8 +435,7 @@ void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
 
   int num_constraints = 6;
 
-  KDL::ChainHdSolver_Vereshchagin_Fext vereshchagin_solver_fext(*chain, root_acc,
-                                                                num_constraints);
+  KDL::ChainHdSolver_Vereshchagin_Fext vereshchagin_solver_fext(*chain, root_acc, num_constraints);
 
   // alpha - constraint forces
   KDL::Jacobian alpha_jac = KDL::Jacobian(num_constraints);
@@ -480,8 +482,8 @@ void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
   // constraint torques
   KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob_state->nj);
 
-  int r = vereshchagin_solver_fext.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext,
-                                             ff_tau_jnt, constraint_tau_jnt);
+  int r = vereshchagin_solver_fext.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext, ff_tau_jnt,
+                                             constraint_tau_jnt);
 
   if (r < 0)
   {
@@ -495,10 +497,9 @@ void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
   }
 }
 
-void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
-                 int num_constraints, double *root_acceleration, double **alpha,
-                 double *beta, double *tau_ff, double *predicted_acc,
-                 double *constraint_tau)
+void achd_solver(Freddy *rob, std::string root_link, std::string tip_link, int num_constraints,
+                 double *root_acceleration, double **alpha, double *beta, double *tau_ff,
+                 double *predicted_acc, double *constraint_tau)
 {
   // create a chain from the root_link to the tip_link
   KDL::Chain chain;
@@ -507,8 +508,8 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
     std::cerr << "[achd] Failed to get chain from KDL tree" << std::endl;
   }
 
-  // joint inertias: 
-  const std::vector<double> joint_inertia {0.5580, 0.5580, 0.5580, 0.5580, 0.1389, 0.1389, 0.1389};
+  // joint inertias:
+  const std::vector<double> joint_inertia{0.5580, 0.5580, 0.5580, 0.5580, 0.1389, 0.1389, 0.1389};
 
   // set joint inertias
   for (size_t i = 0; i < chain.getNrOfJoints(); i++)
@@ -596,8 +597,8 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
   // std::cout << "qd: " << qd << std::endl;
   // std::cout << "ff_tau: " << ff_tau_jnt << std::endl;
 
-  int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext,
-                                        ff_tau_jnt, constraint_tau_jnt);
+  int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext, ff_tau_jnt,
+                                        constraint_tau_jnt);
 
   if (r < 0)
   {
@@ -644,8 +645,7 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link,
 
 void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constraints,
                              double *root_acceleration, double **alpha, double *beta,
-                             double *tau_ff, double *predicted_acc,
-                             double *constraint_tau)
+                             double *tau_ff, double *predicted_acc, double *constraint_tau)
 {
   KDL::Chain chain = rob->chain;
   ManipulatorState *rob_state = rob->state;
@@ -718,8 +718,8 @@ void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constrai
   std::cout << "qd: " << qd << std::endl;
   std::cout << "ff_tau: " << ff_tau_jnt << std::endl;
 
-  int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext,
-                                        ff_tau_jnt, constraint_tau_jnt);
+  int r = vereshchagin_solver.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext, ff_tau_jnt,
+                                        constraint_tau_jnt);
 
   std::vector<KDL::Twist> twists(7);
   vereshchagin_solver.getLinkCartesianAcceleration(twists);
@@ -784,9 +784,8 @@ void base_fd_solver(Freddy *rob, double *platform_forces, double *wheel_torques)
 
   set_weight_matrix(torque_control_state, N, M);
 
-  compute_wheel_torques(rob->mobile_base->mediator->kelo_base_config,
-                        torque_control_state, rob->mobile_base->state->pivot_angles,
-                        wheel_torques, N, M);
+  compute_wheel_torques(rob->mobile_base->mediator->kelo_base_config, torque_control_state,
+                        rob->mobile_base->state->pivot_angles, wheel_torques, N, M);
 
   free_torque_control_state(torque_control_state);
   delete torque_control_state;
@@ -815,8 +814,7 @@ void get_manipulator_data(Manipulator<MediatorType> *rob)
   }
 }
 
-void update_manipulator_state(ManipulatorState *state, std::string tool_frame,
-                              KDL::Tree *tree)
+void update_manipulator_state(ManipulatorState *state, std::string tool_frame, KDL::Tree *tree)
 {
   // *Assumption* - computing values in the base_link frame
   // create a chain from the base_link to the tool_link
@@ -884,8 +882,7 @@ void cap_and_convert_torques(double *tau_command, int num_joints, KDL::JntArray 
   }
 }
 
-void set_manipulator_torques(Freddy *rob, std::string root_link,
-                             KDL::JntArray *tau_command)
+int set_manipulator_torques(Freddy *rob, std::string root_link, KDL::JntArray *tau_command)
 {
   // get robot from root link
   Manipulator<kinova_mediator> *arm =
@@ -896,7 +893,7 @@ void set_manipulator_torques(Freddy *rob, std::string root_link,
   if (r != 0)
   {
     std::cerr << "Failed to set joint torques for the arm" << std::endl;
-    exit(1);
+    return r;
   }
 }
 
@@ -927,8 +924,7 @@ void getLinkSFromRob(std::string link_name, Freddy *rob, double *s)
   }
 }
 
-void computeDistance(std::string *between_ents, std::string asb, Freddy *rob,
-                     double &distance)
+void computeDistance(std::string *between_ents, std::string asb, Freddy *rob, double &distance)
 {
   double *ent1 = new double[6]{};
   double *ent2 = new double[6]{};
@@ -936,13 +932,12 @@ void computeDistance(std::string *between_ents, std::string asb, Freddy *rob,
   getLinkSFromRob(between_ents[0], rob, ent1);
   getLinkSFromRob(between_ents[1], rob, ent2);
 
-  distance = sqrt(pow(ent1[0] - ent2[0], 2) + pow(ent1[1] - ent2[1], 2) +
-                  pow(ent1[2] - ent2[2], 2));
+  distance =
+      sqrt(pow(ent1[0] - ent2[0], 2) + pow(ent1[1] - ent2[1], 2) + pow(ent1[2] - ent2[2], 2));
 }
 
-void getLinkVelocity(std::string link_name, std::string as_seen_by,
-                     std::string with_respect_to, double *vec, Freddy *rob,
-                     double &out_twist)
+void getLinkVelocity(std::string link_name, std::string as_seen_by, std::string with_respect_to,
+                     double *vec, Freddy *rob, double &out_twist)
 {
   // find which robot the link belongs to
   bool is_in_left_chain = false;
@@ -982,15 +977,14 @@ void getLinkVelocity(std::string link_name, std::string as_seen_by,
   }
 }
 
-void getLinkForce(std::string applied_by, std::string applied_to, std::string asb,
-                  double *vec, Freddy *freddy, double &force)
+void getLinkForce(std::string applied_by, std::string applied_to, std::string asb, double *vec,
+                  Freddy *freddy, double &force)
 {
   // TODO: implement this
   force = 0.0;
 }
 
-void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain,
-                     int &link_id)
+void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain, int &link_id)
 {
   is_in_chain = false;
   for (int i = 0; i < chain->getNrOfSegments(); i++)
@@ -1011,13 +1005,13 @@ void findVector(std::string from_ent, std::string to_ent, Freddy *rob, double *v
 
   getLinkSFromRob(from_ent, rob, from_s);
 
-  printf("from_s: %s: %f %f %f %f %f %f\n", from_ent.c_str(), from_s[0], from_s[1],
-         from_s[2], from_s[3], from_s[4], from_s[5]);
+  printf("from_s: %s: %f %f %f %f %f %f\n", from_ent.c_str(), from_s[0], from_s[1], from_s[2],
+         from_s[3], from_s[4], from_s[5]);
 
   getLinkSFromRob(to_ent, rob, to_s);
 
-  printf("to_s: %s: %f %f %f %f %f %f\n", to_ent.c_str(), to_s[0], to_s[1], to_s[2],
-         to_s[3], to_s[4], to_s[5]);
+  printf("to_s: %s: %f %f %f %f %f %f\n", to_ent.c_str(), to_s[0], to_s[1], to_s[2], to_s[3],
+         to_s[4], to_s[5]);
 
   // TODO: dont use hardcoded values
   for (size_t i = 0; i < 3; i++)
@@ -1048,8 +1042,7 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
   double *dir_vec = new double[3]{};
   findVector(from_ent, to_ent, rob, dir_vec);
 
-  std::cout << "dir_vec_p: " << dir_vec[0] << " " << dir_vec[1] << " " << dir_vec[2]
-            << std::endl;
+  std::cout << "dir_vec_p: " << dir_vec[0] << " " << dir_vec[1] << " " << dir_vec[2] << std::endl;
 
   if (asb_ent != "base_link")
   {
@@ -1082,8 +1075,7 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
     }
   }
 
-  std::cout << "dir_vec: " << dir_vec[0] << " " << dir_vec[1] << " " << dir_vec[2]
-            << std::endl;
+  std::cout << "dir_vec: " << dir_vec[0] << " " << dir_vec[1] << " " << dir_vec[2] << std::endl;
 
   findNormalizedVector(dir_vec, dir_vec);
 
@@ -1098,8 +1090,8 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
   }
 }
 
-void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent,
-                      double *wrench, double *transformed_wrench)
+void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, double *wrench,
+                      double *transformed_wrench)
 {
   KDL::Chain chain;
   if (!rob->tree.getChain(from_ent, to_ent, chain))
@@ -1170,9 +1162,8 @@ void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent,
   }
 }
 
-void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
-                     std::string source_frame, std::string target_frame, double **alpha,
-                     int nc, double **transformed_alpha)
+void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree, std::string source_frame,
+                     std::string target_frame, double **alpha, int nc, double **transformed_alpha)
 {
   KDL::Chain chain;
   if (!tree->getChain(source_frame, target_frame, chain))
@@ -1238,9 +1229,9 @@ void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
 }
 
 void transform_alpha_beta(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
-                          std::string source_frame, std::string target_frame,
-                          double **alpha, double *beta, int nc,
-                          double **transformed_alpha, double *transformed_beta)
+                          std::string source_frame, std::string target_frame, double **alpha,
+                          double *beta, int nc, double **transformed_alpha,
+                          double *transformed_beta)
 {
   KDL::Chain chain;
   if (!tree->getChain(source_frame, target_frame, chain))
@@ -1400,8 +1391,8 @@ void transform_alpha(Freddy *rob, std::string source_frame, std::string target_f
 }
 
 void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string target_frame,
-                          double **alpha, double *beta, int nc,
-                          double **transformed_alpha, double *transformed_beta)
+                          double **alpha, double *beta, int nc, double **transformed_alpha,
+                          double *transformed_beta)
 {
   KDL::Chain chain;
   if (!rob->tree.getChain(source_frame, target_frame, chain))
@@ -1554,8 +1545,7 @@ void print_robot_data(Freddy *rob)
   std::cout << "-- tool twist: ";
   for (size_t i = 0; i < 6; i++)
   {
-    std::cout << rob->kinova_right->state->s_dot[rob->kinova_right->state->ns - 1][i]
-              << " ";
+    std::cout << rob->kinova_right->state->s_dot[rob->kinova_right->state->ns - 1][i] << " ";
   }
   std::cout << std::endl;
 
@@ -1615,8 +1605,8 @@ void get_robot_data_sim(Freddy *freddy, double *kinova_left_predicted_acc,
   if (kinova_right_predicted_acc != nullptr)
   {
     get_manipulator_data_sim(freddy->kinova_right, kinova_right_predicted_acc, time_step);
-    update_manipulator_state(freddy->kinova_right->state,
-                             freddy->kinova_right->tool_frame, &freddy->tree);
+    update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
+                             &freddy->tree);
   }
 }
 
@@ -1658,5 +1648,85 @@ void init_2d_array(double **arr, int rows, int cols)
   for (size_t i = 0; i < rows; i++)
   {
     arr[i] = new double[cols]{};
+  }
+}
+
+void get_new_folder_name(const char *dir_path, char *name)
+{
+  // get current time
+  auto now = std::chrono::system_clock::now();
+  auto now_c = std::chrono::system_clock::to_time_t(now);
+
+  // convert to string
+  std::stringstream ss;
+  ss << std::put_time(std::localtime(&now_c), "%d_%m_%Y_%H_%M_%S");
+  std::string time_str = ss.str();
+
+  // create the folder name
+  sprintf(name, "%s/%s", dir_path, time_str.c_str());
+}
+
+void write_control_log_to_open_file(FILE *file, LogControlDataVector &log_data)
+{
+  // append the data to the file as comma separated values
+  for (size_t i = 0; i < log_data.control_data.size(); i++)
+  {
+    fprintf(file, "%f,%f,%f\n", log_data.control_data[i].reference_value,
+            log_data.control_data[i].measured_value, log_data.control_data[i].control_singal);
+  }
+}
+
+void plot_control_log_data(std::vector<LogControlDataVector> &log_data)
+{
+  // plot using matplot++
+  using namespace matplot;
+
+  // 3,3 subplots
+  auto fig = figure();
+  // figure sisze
+  fig->size(1900, 1600);
+  // add prper spacing
+  fig->reactive_mode(true);
+  // increase row spacing
+  tiledlayout(3, 3);
+
+  for (size_t i = 0; i < log_data.size(); i++)
+  {
+    nexttile();
+    const char *title_text = log_data[i].control_variable;
+    // replace _ with space
+    std::string title_text_str(title_text);
+    std::replace(title_text_str.begin(), title_text_str.end(), '_', ' ');
+    title_text = title_text_str.c_str();
+
+    // data is a vector of struct
+    // LogControlDataVector
+    // {
+    //   const char* control_variable;
+    //   std::vector<LogControlData> control_data;
+    // plot measured vs reference for the length of the data
+    std::vector<double> measured;
+    std::vector<double> reference;
+    for (size_t j = 0; j < log_data[i].control_data.size(); j++)
+    {
+      measured.push_back(log_data[i].control_data[j].measured_value);
+      reference.push_back(log_data[i].control_data[j].reference_value);
+    }
+
+    // overlay the reference and measured values with different colors
+    // plot(reference, "r");
+    // hold(on);
+    plot(measured, "b");
+    // hold(off);
+    title(title_text);
+  }
+  show();
+}
+
+void appendArrayToStream(std::stringstream &ss, double *arr, size_t size)
+{
+  for (size_t i = 0; i < size; i++)
+  {
+    ss << arr[i] << ",";
   }
 }
