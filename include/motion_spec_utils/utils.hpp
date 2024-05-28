@@ -357,6 +357,9 @@ void computeDistance1D(std::string *between_ents, double *axis, std::string asb,
 void getLinkForce(std::string applied_by, std::string applied_to, std::string asb, double *vec,
                   Freddy *rob, double &force);
 
+void getLinkPose(std::string link_name, std::string as_seen_by, std::string with_respect_to,
+                     double *vec, Freddy *rob, double &out_pose);
+
 void getLinkVelocity(std::string link_name, std::string as_seen_by, std::string with_respect_to,
                      double *vec, Freddy *rob, double &out_twist);
 

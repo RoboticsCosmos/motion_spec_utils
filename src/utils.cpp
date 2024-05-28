@@ -923,7 +923,8 @@ void getLinkSFromRob(std::string link_name, Freddy *rob, double *s)
 
   if (!is_in_left_chain && !is_in_right_chain)
   {
-    std::cerr << "[getLinkSFromRob] Link "<< link_name <<" not found in the robot chains" << std::endl;
+    std::cerr << "[getLinkSFromRob] Link " << link_name << " not found in the robot chains"
+              << std::endl;
     exit(1);
   }
 
@@ -964,6 +965,22 @@ void computeDistance1D(std::string *between_ents, double *axis, std::string asb,
     if (axis[i] == 1)
     {
       distance = abs(ent1[i] - ent2[i]);
+      return;
+    }
+  }
+}
+
+void getLinkPose(std::string link_name, std::string as_seen_by, std::string with_respect_to,
+                     double *vec, Freddy *rob, double &out_pose)
+{
+  double pose[6]{};
+  getLinkSFromRob(link_name, rob, pose);
+
+  for (size_t i = 0; i < 6; i++)
+  {
+    if (vec[i] == 1)
+    {
+      out_pose = pose[i];
       return;
     }
   }
@@ -1187,7 +1204,7 @@ void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, dou
     wrench_kdl(i) = wrench[i];
   }
 
-  KDL::Wrench transformed_wrench_kdl = frame * wrench_kdl;
+  KDL::Wrench transformed_wrench_kdl = frame.M * wrench_kdl;
 
   for (size_t i = 0; i < 6; i++)
   {
