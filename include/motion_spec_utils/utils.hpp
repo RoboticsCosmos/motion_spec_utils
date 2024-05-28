@@ -327,7 +327,7 @@ void achd_solver(Freddy *rob, std::string root_link, std::string tip_link, int n
                  double *predicted_acc, double *constraint_tau);
 
 void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
-                      double *ext_wrench_tool, double *constraint_tau);
+                      double **ext_wrenches, double *constraint_tau);
 
 void rne_solver(Freddy *rob, std::string root_link, std::string tip_link,
                 double *root_acceleration, double **ext_wrench, double *constraint_tau);
@@ -359,6 +359,8 @@ void getLinkForce(std::string applied_by, std::string applied_to, std::string as
 
 void getLinkVelocity(std::string link_name, std::string as_seen_by, std::string with_respect_to,
                      double *vec, Freddy *rob, double &out_twist);
+
+void getLinkId(Freddy *rob, std::string root_link, std::string tip_link, std::string link_name, int &link_id);
 
 void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain, int &link_id);
 

@@ -412,7 +412,7 @@ void rne_solver_manipulator(Manipulator<kinova_mediator> *rob, double *root_acce
 }
 
 void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
-                      double *ext_wrench_tool, double *constraint_tau)
+                      double **ext_wrenches, double *constraint_tau)
 {
   // create a chain from the root_link to the tip_link
   KDL::Chain *chain = new KDL::Chain();
@@ -452,23 +452,15 @@ void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
 
   // ext wrench
   KDL::Wrenches f_ext;
-
-  for (int i = 0; i < chain->getNrOfSegments() - 1; i++)
+  for (int i = 0; i < chain->getNrOfSegments(); i++)
   {
     KDL::Wrench wrench;
     for (int j = 0; j < 6; j++)
     {
-      wrench(j) = 0.0;
+      wrench(j) = ext_wrenches[i][j];
     }
     f_ext.push_back(wrench);
   }
-
-  KDL::Wrench wrench;
-  for (int j = 0; j < 6; j++)
-  {
-    wrench(j) = ext_wrench_tool[j];
-  }
-  f_ext.push_back(wrench);
 
   // feedforward torques
   KDL::JntArray ff_tau_jnt = KDL::JntArray(rob_state->nj);
@@ -788,6 +780,18 @@ void base_fd_solver(Freddy *rob, double *platform_forces, double *wheel_torques)
   delete torque_control_state;
 }
 
+void getLinkId(Freddy *rob, std::string root_link, std::string tip_link, std::string link_name,
+               int &link_id)
+{
+  KDL::Chain chain;
+  if (!rob->tree.getChain(root_link, tip_link, chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+  }
+
+  getLinkIdFromChain(chain, link_name, link_id);
+}
+
 template <typename MediatorType>
 void get_manipulator_data(Manipulator<MediatorType> *rob)
 {
@@ -899,6 +903,16 @@ int set_manipulator_torques(Freddy *rob, std::string root_link, KDL::JntArray *t
 void getLinkSFromRob(std::string link_name, Freddy *rob, double *s)
 {
   // find which robot the link belongs to
+
+  if (link_name == "base_link")
+  {
+    for (size_t i = 0; i < 6; i++)
+    {
+      s[i] = 0.0;
+    }
+    return;
+  }
+
   int link_id = -1;
   bool is_in_left_chain, is_in_right_chain = false;
   findLinkInChain(link_name, &rob->kinova_left->chain, is_in_left_chain, link_id);
@@ -909,7 +923,7 @@ void getLinkSFromRob(std::string link_name, Freddy *rob, double *s)
 
   if (!is_in_left_chain && !is_in_right_chain)
   {
-    std::cerr << "[getLinkSFromRob] Link not found in the robot chains" << std::endl;
+    std::cerr << "[getLinkSFromRob] Link "<< link_name <<" not found in the robot chains" << std::endl;
     exit(1);
   }
 
