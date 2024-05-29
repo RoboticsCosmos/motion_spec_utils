@@ -357,8 +357,11 @@ void computeDistance1D(std::string *between_ents, double *axis, std::string asb,
 void getLinkForce(std::string applied_by, std::string applied_to, std::string asb, double *vec,
                   Freddy *rob, double &force);
 
-void getLinkPose(std::string link_name, std::string as_seen_by, std::string with_respect_to,
-                     double *vec, Freddy *rob, double &out_pose);
+void getLinkPosition(std::string link_name, std::string as_seen_by, std::string with_respect_to,
+                     double *vec, Freddy *rob, double &out_position);
+
+void getLinkQuaternion(std::string link_name, std::string as_seen_by, std::string with_respect_to,
+                       Freddy *rob, double *out_quaternion);
 
 void getLinkVelocity(std::string link_name, std::string as_seen_by, std::string with_respect_to,
                      double *vec, Freddy *rob, double &out_twist);
@@ -403,6 +406,9 @@ void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string tar
 
 void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, double *wrench,
                       double *transformed_wrench);
+
+void transformS(Freddy *rob, std::string source_frame, std::string target_frame, double *s,
+                double *s_out);
 
 void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constraints,
                              double *root_acceleration, double **alpha, double *beta,

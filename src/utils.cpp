@@ -31,6 +31,7 @@ extern "C"
 #include "motion_spec_utils/utils.hpp"
 
 #include "kdl/frames_io.hpp"
+#include <signal.h>
 
 void initialize_manipulator_state(int num_joints, int num_segments, ManipulatorState *rob)
 {
@@ -47,7 +48,7 @@ void initialize_manipulator_state(int num_joints, int num_segments, ManipulatorS
 
   for (size_t i = 0; i < num_segments; i++)
   {
-    rob->s[i] = new double[6]{};
+    rob->s[i] = new double[7]{};  // *Assumption* - quaternion
     rob->s_dot[i] = new double[6]{};
     rob->s_ddot[i] = new double[6]{};
   }
@@ -155,7 +156,7 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
 
   // initialize the mediators
   int r = 0;
-  // freddy->kinova_left->mediator->initialize(0, 0, 0.0);
+  freddy->kinova_left->mediator->initialize(0, 0, 0.0);
   // r = freddy->kinova_left->mediator->set_control_mode(2);
 
   // if (r != 0)
@@ -854,9 +855,8 @@ void update_manipulator_state(ManipulatorState *state, std::string tool_frame, K
     state->s[i][0] = frame_vels[frame_vel_index].GetFrame().p.x();
     state->s[i][1] = frame_vels[frame_vel_index].GetFrame().p.y();
     state->s[i][2] = frame_vels[frame_vel_index].GetFrame().p.z();
-    state->s[i][3] = frame_vels[frame_vel_index].GetFrame().M.GetRot().x();
-    state->s[i][4] = frame_vels[frame_vel_index].GetFrame().M.GetRot().y();
-    state->s[i][5] = frame_vels[frame_vel_index].GetFrame().M.GetRot().z();
+    frame_vels[frame_vel_index].GetFrame().M.GetQuaternion(state->s[i][3], state->s[i][4],
+                                                           state->s[i][5], state->s[i][6]);
   }
 }
 
@@ -910,6 +910,7 @@ void getLinkSFromRob(std::string link_name, Freddy *rob, double *s)
     {
       s[i] = 0.0;
     }
+    s[6] = 1.0;  // *Assumption* - quaternion
     return;
   }
 
@@ -932,7 +933,8 @@ void getLinkSFromRob(std::string link_name, Freddy *rob, double *s)
   const double *state = is_in_left_chain ? rob->kinova_left->state->s[link_id]
                                          : rob->kinova_right->state->s[link_id];
 
-  for (size_t i = 0; i < 6; i++)
+  // *Assumption* - quaternion
+  for (size_t i = 0; i < 7; i++)
   {
     s[i] = state[i];
   }
@@ -946,6 +948,7 @@ void computeDistance(std::string *between_ents, std::string asb, Freddy *rob, do
   getLinkSFromRob(between_ents[0], rob, ent1);
   getLinkSFromRob(between_ents[1], rob, ent2);
 
+  // *Assumption* - euclidean distance for linear components
   distance =
       sqrt(pow(ent1[0] - ent2[0], 2) + pow(ent1[1] - ent2[1], 2) + pow(ent1[2] - ent2[2], 2));
 }
@@ -959,8 +962,8 @@ void computeDistance1D(std::string *between_ents, double *axis, std::string asb,
   getLinkSFromRob(between_ents[0], rob, ent1);
   getLinkSFromRob(between_ents[1], rob, ent2);
 
-  // *Assumption* - axis-aligned vector
-  for (size_t i = 0; i < 6; i++)
+  // *Assumption* - axis-aligned vector for linear components
+  for (size_t i = 0; i < 3; i++)
   {
     if (axis[i] == 1)
     {
@@ -968,22 +971,50 @@ void computeDistance1D(std::string *between_ents, double *axis, std::string asb,
       return;
     }
   }
+
+  // if not
+  std::cerr << "[computeDistance1D] Requested angular distance" << std::endl;
+  raise(SIGINT);
 }
 
-void getLinkPose(std::string link_name, std::string as_seen_by, std::string with_respect_to,
-                     double *vec, Freddy *rob, double &out_pose)
+void getLinkPosition(std::string link_name, std::string as_seen_by, std::string with_respect_to,
+                     double *vec, Freddy *rob, double &out_position)
 {
-  double pose[6]{};
+  double pose[7]{};
   getLinkSFromRob(link_name, rob, pose);
 
-  for (size_t i = 0; i < 6; i++)
+  for (size_t i = 0; i < 3; i++)
   {
     if (vec[i] == 1)
     {
-      out_pose = pose[i];
+      out_position = pose[i];
       return;
     }
   }
+
+  // if not
+  std::cerr << "[getLinkPosition] Requested angular pose" << std::endl;
+  raise(SIGINT);
+}
+
+void getLinkQuaternion(std::string link_name, std::string as_seen_by, std::string with_respect_to,
+                       Freddy *rob, double *out_quaternion)
+{
+  double pose[7]{};
+  getLinkSFromRob(link_name, rob, pose);
+
+  // *Assumption* - wrt base_link
+
+  if (as_seen_by == "base_link")
+  {
+    for (size_t i = 0; i < 4; i++)
+    {
+      out_quaternion[i] = pose[i + 3];
+    }
+    return;
+  }
+
+  // Transformation to as_seen_by frame
 }
 
 void getLinkVelocity(std::string link_name, std::string as_seen_by, std::string with_respect_to,
@@ -1050,20 +1081,19 @@ void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain
 
 void findVector(std::string from_ent, std::string to_ent, Freddy *rob, double *vec)
 {
-  double *from_s = new double[6]{};
-  double *to_s = new double[6]{};
+  double *from_s = new double[7]{};
+  double *to_s = new double[7]{};
 
   getLinkSFromRob(from_ent, rob, from_s);
 
-  printf("from_s: %s: %f %f %f %f %f %f\n", from_ent.c_str(), from_s[0], from_s[1], from_s[2],
-         from_s[3], from_s[4], from_s[5]);
+  printf("from_s: %s: %f %f %f\n", from_ent.c_str(), from_s[0], from_s[1], from_s[2]);
 
   getLinkSFromRob(to_ent, rob, to_s);
 
-  printf("to_s: %s: %f %f %f %f %f %f\n", to_ent.c_str(), to_s[0], to_s[1], to_s[2], to_s[3],
-         to_s[4], to_s[5]);
+  printf("to_s: %s: %f %f %f\n", to_ent.c_str(), to_s[0], to_s[1], to_s[2]);
 
   // TODO: dont use hardcoded values
+  // *Assumption* - only linear components
   for (size_t i = 0; i < 3; i++)
   {
     vec[i] = to_s[i] - from_s[i];
@@ -1074,6 +1104,7 @@ void findNormalizedVector(const double *vec, double *normalized_vec)
 {
   double norm = 0.0;
   // TODO: dont use hardcoded values
+  // *Assumption* - only linear components
   for (size_t i = 0; i < 3; i++)
   {
     norm += vec[i] * vec[i];
@@ -1134,6 +1165,8 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
     vec[i] = signal * dir_vec[i];
   }
 
+  // TODO: update to only for linear components
+  std::cerr << "[decomposeSignal] should only be for linear, update it" << std::endl;
   for (size_t i = 3; i < 6; i++)
   {
     vec[i] = 0.0;
@@ -1535,11 +1568,88 @@ void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string tar
   }
 }
 
+void transformS(Freddy *rob, std::string source_frame, std::string target_frame, double *s,
+                double *s_out)
+{
+  // construct KDL chain from from_ent to to_ent
+  KDL::Chain chain;
+  if (!rob->tree.getChain(source_frame, target_frame, chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+    exit(1);
+  }
+
+  KDL::Frame frame;
+  KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
+
+  KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
+
+  // update q values from the robot state
+  bool is_in_left_chain, is_in_right_chain = false;
+
+  std::string not_base_link = source_frame == "base_link" ? target_frame : source_frame;
+  int link_id = -1;
+  findLinkInChain(not_base_link, &rob->kinova_left->chain, is_in_left_chain, link_id);
+
+  if (!is_in_left_chain)
+  {
+    findLinkInChain(not_base_link, &rob->kinova_right->chain, is_in_right_chain, link_id);
+  }
+
+  if (!is_in_left_chain && !is_in_right_chain)
+  {
+    std::cerr << "[transformS] Link not found in the robot chains" << std::endl;
+    exit(1);
+  }
+
+  ManipulatorState *rob_state = is_in_left_chain ? rob->kinova_left->state : rob->kinova_right->state;
+
+  bool forward = true;
+  if (source_frame != "base_link" && target_frame == "base_link")
+  {
+    forward = false;
+  }
+
+  if (chain.getNrOfJoints() != 0)
+  {
+    if (forward)
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[i];
+      }
+    }
+    else
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[rob_state->nj - i - 1];
+      }
+    }
+  }
+
+  fk_solver_pos.JntToCart(q, frame);
+
+  // construct the source frame from the s values
+  KDL::Frame source_frame_kdl;
+  source_frame_kdl.p = KDL::Vector(s[0], s[1], s[2]);
+  source_frame_kdl.M = KDL::Rotation::Quaternion(s[3], s[4], s[5], s[6]);
+
+  // transform the source frame to the target frame
+  KDL::Frame target_frame_kdl = frame.Inverse() * source_frame_kdl;
+
+  // convert the target frame to s values
+  s_out[0] = target_frame_kdl.p.x();
+  s_out[1] = target_frame_kdl.p.y();
+  s_out[2] = target_frame_kdl.p.z();
+  target_frame_kdl.M.GetQuaternion(s_out[3], s_out[4], s_out[5], s_out[6]);
+}
+
 void get_robot_data(Freddy *freddy)
 {
-  // get_manipulator_data(freddy->kinova_left);
-  // update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
-  //                          &freddy->tree);
+  get_manipulator_data(freddy->kinova_left);
+  update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
+                           &freddy->tree);
 
   get_manipulator_data(freddy->kinova_right);
   update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
@@ -1587,7 +1697,7 @@ void print_robot_data(Freddy *rob)
   }
   std::cout << std::endl;
   std::cout << "-- tool pose: ";
-  for (size_t i = 0; i < 6; i++)
+  for (size_t i = 0; i < 7; i++)
   {
     std::cout << rob->kinova_right->state->s[rob->kinova_right->state->ns - 1][i] << " ";
   }
