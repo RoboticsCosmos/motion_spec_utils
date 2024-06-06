@@ -85,12 +85,21 @@ void free_manipulator_state(ManipulatorState *rob)
 void initialize_mobile_base_state(MobileBaseState *base)
 {
   base->pivot_angles = new double[4]{};
+  base->wheel_encoder_values = new double[8]{};
+  base->prev_wheel_encoder_values = new double[8]{};
+
+  base->odomx = 0.0;
+  base->odomy = 0.0;
+  base->odoma = 0.0;
+
   base->tau_command = new double[8]{};
 }
 
 void free_mobile_base_state(MobileBaseState *base)
 {
   delete[] base->pivot_angles;
+  delete[] base->wheel_encoder_values;
+  delete[] base->prev_wheel_encoder_values;
   delete[] base->tau_command;
 }
 
@@ -156,7 +165,7 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
 
   // initialize the mediators
   int r = 0;
-  freddy->kinova_left->mediator->initialize(0, 0, 0.0);
+  // freddy->kinova_left->mediator->initialize(0, 0, 0.0);
   // r = freddy->kinova_left->mediator->set_control_mode(2);
 
   // if (r != 0)
@@ -174,18 +183,18 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
   //   exit(1);
   // }
 
-  // init_ecx_context(freddy->mobile_base->mediator->ethercat_config);
+  init_ecx_context(freddy->mobile_base->mediator->ethercat_config);
 
-  // int result = 0;
-  // establish_kelo_base_connection(freddy->mobile_base->mediator->kelo_base_config,
-  //                                freddy->mobile_base->mediator->ethercat_config,
-  //                                interface, &result);
+  int result = 0;
+  char ifname[] = "eno1";
+  establish_kelo_base_connection(freddy->mobile_base->mediator->kelo_base_config,
+                                 freddy->mobile_base->mediator->ethercat_config, ifname, &result);
 
-  // if (result != 0)
-  // {
-  //   std::cerr << "Failed to establish connection with the mobile base" << std::endl;
-  //   exit(1);
-  // }
+  if (result != 0)
+  {
+    std::cerr << "Failed to establish connection with the mobile base" << std::endl;
+    exit(1);
+  }
 
   std::cout << "Successfully initialized robot" << std::endl;
 }
@@ -472,8 +481,10 @@ void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
   // constraint torques
   KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob_state->nj);
 
+  // auto start_time = std::chrono::high_resolution_clock::now();
   int r = vereshchagin_solver_fext.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext, ff_tau_jnt,
                                              constraint_tau_jnt);
+  auto end_time = std::chrono::high_resolution_clock::now();
 
   if (r < 0)
   {
@@ -485,6 +496,9 @@ void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
   {
     constraint_tau[i] = constraint_tau_jnt(i);
   }
+
+  // std::chrono::duration<double> elapsed_time = end_time - start_time;
+  // std::cout << "[achd fext] Time taken: " << elapsed_time.count() << "s" << std::endl;
 }
 
 void achd_solver(Freddy *rob, std::string root_link, std::string tip_link, int num_constraints,
@@ -1184,7 +1198,8 @@ void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, dou
   }
 
   bool forward = true;
-  if (from_ent != "base_link" && to_ent == "base_link")
+  if (from_ent.find("base_link") == std::string::npos &&
+      to_ent.find("base_link") != std::string::npos)
   {
     forward = false;
   }
@@ -1602,7 +1617,8 @@ void transformS(Freddy *rob, std::string source_frame, std::string target_frame,
     exit(1);
   }
 
-  ManipulatorState *rob_state = is_in_left_chain ? rob->kinova_left->state : rob->kinova_right->state;
+  ManipulatorState *rob_state =
+      is_in_left_chain ? rob->kinova_left->state : rob->kinova_right->state;
 
   bool forward = true;
   if (source_frame != "base_link" && target_frame == "base_link")
@@ -1645,19 +1661,101 @@ void transformS(Freddy *rob, std::string source_frame, std::string target_frame,
   target_frame_kdl.M.GetQuaternion(s_out[3], s_out[4], s_out[5], s_out[6]);
 }
 
+void transformSdot(Freddy *rob, std::string source_frame, std::string target_frame, double *s_dot,
+                   double *s_dot_out)
+{
+  // construct KDL chain from from_ent to to_ent
+  KDL::Chain chain;
+  if (!rob->tree.getChain(source_frame, target_frame, chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+    exit(1);
+  }
+
+  KDL::Frame frame;
+  KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
+
+  KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
+
+  // update q values from the robot state
+  bool is_in_left_chain, is_in_right_chain = false;
+
+  std::string not_base_link = source_frame == "base_link" ? target_frame : source_frame;
+  int link_id = -1;
+  findLinkInChain(not_base_link, &rob->kinova_left->chain, is_in_left_chain, link_id);
+
+  if (!is_in_left_chain)
+  {
+    findLinkInChain(not_base_link, &rob->kinova_right->chain, is_in_right_chain, link_id);
+  }
+
+  if (!is_in_left_chain && !is_in_right_chain)
+  {
+    std::cerr << "[transformS] Link not found in the robot chains" << std::endl;
+    exit(1);
+  }
+
+  ManipulatorState *rob_state =
+      is_in_left_chain ? rob->kinova_left->state : rob->kinova_right->state;
+
+  bool forward = true;
+  if (source_frame != "base_link" && target_frame == "base_link")
+  {
+    forward = false;
+  }
+
+  if (chain.getNrOfJoints() != 0)
+  {
+    if (forward)
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[i];
+      }
+    }
+    else
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[rob_state->nj - i - 1];
+      }
+    }
+  }
+
+  fk_solver_pos.JntToCart(q, frame);
+
+  // construct the twist from the s_dot values
+  KDL::Twist source_twist;
+  source_twist.vel = KDL::Vector(s_dot[0], s_dot[1], s_dot[2]);
+  source_twist.rot = KDL::Vector(s_dot[3], s_dot[4], s_dot[5]);
+
+  // transform the twist to the target frame
+  KDL::Twist target_twist = frame.M.Inverse() * source_twist;
+
+  // convert the target twist to s_dot values
+  for (size_t i = 0; i < 6; i++)
+  {
+    s_dot_out[i] = target_twist(i);
+  }
+}
+
 void get_robot_data(Freddy *freddy)
 {
-  get_manipulator_data(freddy->kinova_left);
-  update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
-                           &freddy->tree);
+  // get_manipulator_data(freddy->kinova_left);
+  // update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
+  //                          &freddy->tree);
 
   get_manipulator_data(freddy->kinova_right);
   update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
                            &freddy->tree);
 
-  // get_kelo_base_state(freddy->mobile_base->mediator->kelo_base_config,
-  //                     freddy->mobile_base->mediator->ethercat_config,
-  //                     freddy->mobile_base->state->pivot_angles);
+  send_and_receive_data(freddy->mobile_base->mediator->ethercat_config);
+  get_kelo_base_state(
+      freddy->mobile_base->mediator->kelo_base_config,
+      freddy->mobile_base->mediator->ethercat_config, freddy->mobile_base->state->pivot_angles,
+      freddy->mobile_base->state->wheel_encoder_values,
+      freddy->mobile_base->state->prev_wheel_encoder_values, &freddy->mobile_base->state->odomx,
+      &freddy->mobile_base->state->odomy, &freddy->mobile_base->state->odoma);
 }
 
 void print_robot_data(Freddy *rob)

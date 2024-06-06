@@ -201,8 +201,6 @@ struct LogManipulatorData
   }
 };
 
-
-
 struct LogDataMobileBase
 {
   // mobile base info
@@ -366,7 +364,8 @@ void getLinkQuaternion(std::string link_name, std::string as_seen_by, std::strin
 void getLinkVelocity(std::string link_name, std::string as_seen_by, std::string with_respect_to,
                      double *vec, Freddy *rob, double &out_twist);
 
-void getLinkId(Freddy *rob, std::string root_link, std::string tip_link, std::string link_name, int &link_id);
+void getLinkId(Freddy *rob, std::string root_link, std::string tip_link, std::string link_name,
+               int &link_id);
 
 void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain, int &link_id);
 
@@ -409,6 +408,9 @@ void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, dou
 
 void transformS(Freddy *rob, std::string source_frame, std::string target_frame, double *s,
                 double *s_out);
+
+void transformSdot(Freddy *rob, std::string source_frame, std::string target_frame, double *s_dot,
+                   double *s_dot_out);
 
 void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constraints,
                              double *root_acceleration, double **alpha, double *beta,
