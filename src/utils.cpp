@@ -30,9 +30,6 @@ extern "C"
 
 #include "motion_spec_utils/utils.hpp"
 
-#include "kdl/frames_io.hpp"
-#include <signal.h>
-
 void initialize_manipulator_state(int num_joints, int num_segments, ManipulatorState *rob)
 {
   rob->nj = num_joints;
@@ -87,10 +84,10 @@ void initialize_mobile_base_state(MobileBaseState *base)
   base->pivot_angles = new double[4]{};
   base->wheel_encoder_values = new double[8]{};
   base->prev_wheel_encoder_values = new double[8]{};
+  base->qd_wheel = new double[8]{};
 
-  base->odomx = 0.0;
-  base->odomy = 0.0;
-  base->odoma = 0.0;
+  base->xd_platform = new double[3]{};  // vx, vy, va
+  base->x_platform = new double[3]{};   // x, y, theta
 
   base->tau_command = new double[8]{};
 }
@@ -100,6 +97,11 @@ void free_mobile_base_state(MobileBaseState *base)
   delete[] base->pivot_angles;
   delete[] base->wheel_encoder_values;
   delete[] base->prev_wheel_encoder_values;
+  delete[] base->qd_wheel;
+
+  delete[] base->xd_platform;
+  delete[] base->x_platform;
+
   delete[] base->tau_command;
 }
 
@@ -481,7 +483,7 @@ void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
   // constraint torques
   KDL::JntArray constraint_tau_jnt = KDL::JntArray(rob_state->nj);
 
-  // auto start_time = std::chrono::high_resolution_clock::now();
+  auto start_time = std::chrono::high_resolution_clock::now();
   int r = vereshchagin_solver_fext.CartToJnt(q, qd, qdd, alpha_jac, beta_jnt, f_ext, ff_tau_jnt,
                                              constraint_tau_jnt);
   auto end_time = std::chrono::high_resolution_clock::now();
@@ -497,7 +499,7 @@ void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
     constraint_tau[i] = constraint_tau_jnt(i);
   }
 
-  // std::chrono::duration<double> elapsed_time = end_time - start_time;
+  std::chrono::duration<double> elapsed_time = end_time - start_time;
   // std::cout << "[achd fext] Time taken: " << elapsed_time.count() << "s" << std::endl;
 }
 
@@ -807,6 +809,72 @@ void getLinkId(Freddy *rob, std::string root_link, std::string tip_link, std::st
   getLinkIdFromChain(chain, link_name, link_id);
 }
 
+void wrench_estimator(Freddy *rob, std::string root_link, std::string tip_link,
+                      double *root_acceleration, double *tau, double *tool_wrench)
+{
+  // create a chain from the root_link to the tip_link
+  KDL::Chain chain;
+  if (!rob->tree.getChain(root_link, tip_link, chain))
+  {
+    std::cerr << "[achd] Failed to get chain from KDL tree" << std::endl;
+  }
+
+  // joint inertias:
+  const std::vector<double> joint_inertia{0.5580, 0.5580, 0.5580, 0.5580, 0.1389, 0.1389, 0.1389};
+
+  // set joint inertias
+  for (size_t i = 0; i < chain.getNrOfJoints(); i++)
+  {
+    chain.getSegment(i).setJoint().setJointInertia(joint_inertia[i]);
+  }
+
+  // get the corresponding robot state
+  ManipulatorState *rob_state = nullptr;
+
+  rob_state = root_link == rob->kinova_left->base_frame ? rob->kinova_left->state
+                                                        : rob->kinova_right->state;
+
+  if (rob_state == nullptr)
+  {
+    std::cerr << "Failed to find the robot state" << std::endl;
+    exit(1);
+  }
+
+  // root acceleration
+  KDL::Twist root_acc(
+      KDL::Vector(-root_acceleration[0], -root_acceleration[1], -root_acceleration[2]),
+      KDL::Vector(root_acceleration[3], root_acceleration[4], root_acceleration[5]));
+
+  KDL::ChainExternalWrenchEstimator ext_wrench_estimator(chain, root_acc.vel, 100.0, 30.0, 0.5);
+
+  // q, qd, qdd
+  KDL::JntArray q = KDL::JntArray(rob_state->nj);
+  KDL::JntArray qd = KDL::JntArray(rob_state->nj);
+
+  for (size_t i = 0; i < rob_state->nj; i++)
+  {
+    q(i) = rob_state->q[i];
+    qd(i) = rob_state->q_dot[i];
+  }
+
+  KDL::JntArray jnt_tau = KDL::JntArray(rob_state->nj);
+
+  for (size_t i = 0; i < rob_state->nj; i++)
+  {
+    jnt_tau(i) = tau[i];
+  }
+
+  // ext wrench
+  KDL::Wrench f_ext;
+
+  ext_wrench_estimator.JntToExtWrench(q, qd, jnt_tau, f_ext);
+
+  for (size_t i = 0; i < 6; i++)
+  {
+    tool_wrench[i] = f_ext(i);
+  }
+}
+
 template <typename MediatorType>
 void get_manipulator_data(Manipulator<MediatorType> *rob)
 {
@@ -822,11 +890,6 @@ void get_manipulator_data(Manipulator<MediatorType> *rob)
     rob->state->q[i] = q(i);
     rob->state->q_dot[i] = q_dot(i);
     rob->state->tau_measured[i] = tau_measured(i);
-  }
-
-  for (size_t i = 0; i < 6; i++)
-  {
-    rob->state->f_tool_measured[i] = f_tool_measured(i);
   }
 }
 
@@ -1739,7 +1802,33 @@ void transformSdot(Freddy *rob, std::string source_frame, std::string target_fra
   }
 }
 
-void get_robot_data(Freddy *freddy)
+void transform_with_frame(double *source_frame, double *transform, double *transformed_frame)
+{
+  KDL::Frame source_frame_kdl;
+  // TODO: maybe not the best way to handle this
+  if (source_frame[6] == 0.0)
+  {
+    source_frame[6] = 1.0;
+  }
+  source_frame_kdl.p = KDL::Vector(source_frame[0], source_frame[1], source_frame[2]);
+  source_frame_kdl.M = KDL::Rotation::Quaternion(source_frame[3], source_frame[4], source_frame[5],
+                                                 source_frame[6]);
+
+  KDL::Frame transform_kdl;
+  transform_kdl.p = KDL::Vector(transform[0], transform[1], transform[2]);
+  transform_kdl.M =
+      KDL::Rotation::Quaternion(transform[3], transform[4], transform[5], transform[6]);
+
+  KDL::Frame transformed_frame_kdl = transform_kdl * source_frame_kdl;
+
+  transformed_frame[0] = transformed_frame_kdl.p.x();
+  transformed_frame[1] = transformed_frame_kdl.p.y();
+  transformed_frame[2] = transformed_frame_kdl.p.z();
+  transformed_frame_kdl.M.GetQuaternion(transformed_frame[3], transformed_frame[4],
+                                        transformed_frame[5], transformed_frame[6]);
+}
+
+void get_robot_data(Freddy *freddy, double dt)
 {
   // get_manipulator_data(freddy->kinova_left);
   // update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
@@ -1753,9 +1842,108 @@ void get_robot_data(Freddy *freddy)
   get_kelo_base_state(
       freddy->mobile_base->mediator->kelo_base_config,
       freddy->mobile_base->mediator->ethercat_config, freddy->mobile_base->state->pivot_angles,
-      freddy->mobile_base->state->wheel_encoder_values,
-      freddy->mobile_base->state->prev_wheel_encoder_values, &freddy->mobile_base->state->odomx,
-      &freddy->mobile_base->state->odomy, &freddy->mobile_base->state->odoma);
+      freddy->mobile_base->state->wheel_encoder_values, freddy->mobile_base->state->qd_wheel);
+
+  compute_kelo_platform_velocity(freddy);
+  compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, dt,
+                             freddy->mobile_base->state->x_platform);
+}
+
+void compute_kelo_platform_velocity(Freddy *rob)
+{
+  double caster_offsets[4]{};
+  for (size_t i = 0; i < 4; i++)
+  {
+    caster_offsets[i] = rob->mobile_base->mediator->kelo_base_config->castor_offset;
+  }
+
+  double wheel_distances[4]{};
+  for (size_t i = 0; i < 4; i++)
+  {
+    wheel_distances[i] = rob->mobile_base->mediator->kelo_base_config->half_wheel_distance * 2;
+  }
+
+  double wheel_diameters[8]{};
+  for (size_t i = 0; i < 8; i++)
+  {
+    wheel_diameters[i] = rob->mobile_base->mediator->kelo_base_config->radius * 2;
+  }
+
+  double vel_dist_mat[rob->mobile_base->mediator->kelo_base_config->nWheels * 2 * 3]{};
+
+  kelo_pltf_vel_dist_mat(rob->mobile_base->mediator->kelo_base_config->nWheels,
+                         rob->mobile_base->mediator->kelo_base_config->wheel_coordinates,
+                         caster_offsets, wheel_distances, wheel_diameters,
+                         rob->mobile_base->state->pivot_angles, vel_dist_mat);
+
+  double w_platform[3 * 3] = {
+      // [1/N^2], [1/(N Nm)], [1/(Nm)^2]
+      1.0, 0.0, 0.0,  // xx, xy, xm
+      0.0, 1.0, 0.0,  // yx, yy, ym
+      0.0, 0.0, 1.0   // mx, my, mm
+  };
+  double w_drive[4 * 4] = {
+      // [1/N^2]
+      1.0, 0.0, 0.0, 1.0,  // fl-xx, fl-xy, fl-yx, fl-yy
+      1.0, 0.0, 0.0, 1.0,  // rl-xx, rl-xy, rl-yx, rl-yy
+      1.0, 0.0, 0.0, 1.0,  // rr-xx, rr-xy, rr-yx, rr-yy
+      1.0, 0.0, 0.0, 1.0   // fr-xx, fr-xy, fr-yx, fr-yy
+  };
+
+  kelo_pltf_slv_fwd_vel_comp(rob->mobile_base->mediator->kelo_base_config->nWheels, vel_dist_mat,
+                             w_platform, w_drive, rob->mobile_base->state->qd_wheel,
+                             rob->mobile_base->state->xd_platform);
+}
+
+void compute_kelo_platform_pose(double *xd_platform, double dt, double *x_platform)
+{
+  double dx, dy;
+
+  if (fabs(xd_platform[2] > 0.001))
+  {
+    double vlin = sqrt(xd_platform[0] * xd_platform[0] + xd_platform[1] * xd_platform[1]);
+    double direction = atan2(xd_platform[1], xd_platform[0]);
+    double circleRadius = fabs(vlin / xd_platform[2]);
+    double sign = 1;
+    if (xd_platform[2] < 0)
+      sign = -1;
+    // displacement relative to direction of movement
+    double dx_rel = circleRadius * sin(fabs(xd_platform[2]) * dt);
+    double dy_rel = sign * circleRadius * (1 - cos(fabs(xd_platform[2]) * dt));
+
+    // transform displacement to previous robot frame
+    dx = dx_rel * cos(direction) - dy_rel * sin(direction);
+    dy = dx_rel * sin(direction) + dy_rel * cos(direction);
+  }
+  else
+  {
+    dx = xd_platform[0] * dt;
+    dy = xd_platform[1] * dt;
+  }
+
+  // transform displacement to odom frame
+  x_platform[0] += dx * cos(x_platform[2]) - dy * sin(x_platform[2]);
+  x_platform[1] += dx * sin(x_platform[2]) + dy * cos(x_platform[2]);
+  x_platform[2] = norm(x_platform[2] + xd_platform[2] * dt);
+}
+
+void print_matrix2(int rows, int cols, const double *a)
+{
+  printf("[");
+  for (int m_ = 0; m_ < rows; m_++)
+  {
+    printf("[");
+    for (int n_ = 0; n_ < cols; n_++)
+    {
+      printf("%f", a[m_ + n_ * rows]);
+      if (n_ != cols - 1)
+        printf(", ");
+    }
+    printf("]");
+    if (m_ != rows - 1)
+      printf(",\n");
+  }
+  printf("]");
 }
 
 void print_robot_data(Freddy *rob)
@@ -1924,67 +2112,11 @@ void get_new_folder_name(const char *dir_path, char *name)
   sprintf(name, "%s/%s", dir_path, time_str.c_str());
 }
 
-void write_control_log_to_open_file(FILE *file, LogControlDataVector &log_data)
+void write_odom_data_to_open_file(FILE *file, std::vector<std::array<double, 3>> &odom_data)
 {
   // append the data to the file as comma separated values
-  for (size_t i = 0; i < log_data.control_data.size(); i++)
+  for (size_t i = 0; i < odom_data.size(); i++)
   {
-    fprintf(file, "%f,%f,%f\n", log_data.control_data[i].reference_value,
-            log_data.control_data[i].measured_value, log_data.control_data[i].control_singal);
-  }
-}
-
-// void plot_control_log_data(std::vector<LogControlDataVector> &log_data)
-// {
-//   // plot using matplot++
-//   using namespace matplot;
-
-//   // 3,3 subplots
-//   auto fig = figure();
-//   // figure sisze
-//   fig->size(1900, 1600);
-//   // add prper spacing
-//   fig->reactive_mode(true);
-//   // increase row spacing
-//   tiledlayout(3, 3);
-
-//   for (size_t i = 0; i < log_data.size(); i++)
-//   {
-//     nexttile();
-//     const char *title_text = log_data[i].control_variable;
-//     // replace _ with space
-//     std::string title_text_str(title_text);
-//     std::replace(title_text_str.begin(), title_text_str.end(), '_', ' ');
-//     title_text = title_text_str.c_str();
-
-//     // data is a vector of struct
-//     // LogControlDataVector
-//     // {
-//     //   const char* control_variable;
-//     //   std::vector<LogControlData> control_data;
-//     // plot measured vs reference for the length of the data
-//     std::vector<double> measured;
-//     std::vector<double> reference;
-//     for (size_t j = 0; j < log_data[i].control_data.size(); j++)
-//     {
-//       measured.push_back(log_data[i].control_data[j].measured_value);
-//       reference.push_back(log_data[i].control_data[j].reference_value);
-//     }
-
-//     // overlay the reference and measured values with different colors
-//     // plot(reference, "r");
-//     // hold(on);
-//     plot(measured, "b");
-//     // hold(off);
-//     title(title_text);
-//   }
-//   show();
-// }
-
-void appendArrayToStream(std::stringstream &ss, double *arr, size_t size)
-{
-  for (size_t i = 0; i < size; i++)
-  {
-    ss << arr[i] << ",";
+    fprintf(file, "%f,%f,%f\n", odom_data[i][0], odom_data[i][1], odom_data[i][2]);
   }
 }

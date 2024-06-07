@@ -42,10 +42,10 @@ struct MobileBaseState
   double *pivot_angles;
   double *wheel_encoder_values;
   double *prev_wheel_encoder_values;
+  double *qd_wheel;
 
-  double odomx;
-  double odomy;
-  double odoma;
+  double *xd_platform;
+  double *x_platform;
 
   double *tau_command;
 };

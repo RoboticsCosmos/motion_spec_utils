@@ -22,6 +22,7 @@ find_package(kdl_parser REQUIRED)
 find_package(orocos_kdl REQUIRED)
 find_package(kinova_mediator REQUIRED)
 find_package(kelo_motion_control REQUIRED)
+find_package(kelo-kindyn REQUIRED)
 
 # append orocos include dirs
 list(APPEND local_INCLUDE_DIRS ${CMAKE_INSTALL_PREFIX}/include/)
@@ -61,6 +62,7 @@ target_link_libraries(mutils
   KortexApiCpp
   pthread
   kelo_motion_control
+  kelo_kindyn
 )
 
 add_library(solver_utils SHARED src/solver_utils.cpp)
