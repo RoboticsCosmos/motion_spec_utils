@@ -33,104 +33,44 @@
  * coordinate systems
  */
 
-#include <iostream>
-
 #include "kdl/chain.hpp"
 #include "kdl/chainfksolverpos_recursive.hpp"
+#include "kdl/chainfksolvervel_recursive.hpp"
 #include "kdl/frames.hpp"
+#include "kdl/jacobian.hpp"
 #include "kdl/jntarray.hpp"
+#include "kdl/frames_io.hpp"
+#include "kdl/kinfam_io.hpp"
+#include "kdl/tree.hpp"
+#include "kdl_parser/kdl_parser.hpp"
+#include "motion_spec_utils/robot_structs.hpp"
 
-/**
- * @brief enum for different coordinate systems
- */
-enum class CoordinateSystem { BASE, EE };
+void transform_alpha(Freddy *rob, std::string source_frame, std::string target_frame,
+                     double **alpha, int nc, double **transformed_alpha);
 
-class TfUtils {
- public:
-  TfUtils();
+void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree, std::string source_frame,
+                     std::string target_frame, double **alpha, int nc, double **transformed_alpha);
 
-  ~TfUtils();
+void transform_alpha_beta(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
+                          std::string source_frame, std::string target_frame, double **alpha,
+                          double *beta, int nc, double **transformed_alpha,
+                          double *transformed_beta);
 
-  /**
-   * @brief set the chain for the forward kinematics solver
-   * @param chain A pointer to a KDL::Chain object representing the robot's
-   * kinematic chain.
-   */
-  void setChain(KDL::Chain *chain);
+void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string target_frame,
+                          double **alpha, double *beta, int nc, double **transformed_alpha,
+                          double *transformed_beta);
 
-  /**
-   * @brief Converts a KDL::Frame from one frame to another.
-   * @param source_frame The KDL::Frame to convert.
-   * @param q A pointer to a KDL::JntArray object representing the robot's joint
-   * positions.
-   * @param source_cs enum for the source coordinate system
-   * @param target_cs enum for the target coordinate system
-   * @param segment_nr The segment number of the desired link. If not specified,
-   * the last segment of the chain is used.
-   */
-  void transform(KDL::Frame &source_frame, KDL::JntArray *q,
-                 CoordinateSystem source_cs, CoordinateSystem target_cs,
-                 int segment_nr = -1);
+void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, double *wrench,
+                      double *transformed_wrench);
 
-  /**
-   * @brief Converts a KDL::Twist from one frame to another.
-   * @param source_twist The KDL::Twist to convert.
-   * @param q A pointer to a KDL::JntArray object representing the robot's joint
-   * positions.
-   * @param source_cs enum for the source coordinate system
-   * @param target_cs enum for the target coordinate system
-   * @param segment_nr The segment number of the desired link. If not specified,
-   * the last segment of the chain is used.
-   */
-  void transform(KDL::Twist &source_twist, KDL::JntArray *q,
-                 CoordinateSystem source_cs, CoordinateSystem target_cs,
-                 int segment_nr = -1);
+void transformS(Freddy *rob, std::string source_frame, std::string target_frame, double *s,
+                double *s_out);
 
-  /**
-   * @brief Transforms a KDL::Wrench from one frame to another.
-   * @param source_wrench The KDL::Wrench to convert.
-   * @param q A pointer to a KDL::JntArray object representing the robot's joint
-   * positions.
-   * @param source_cs enum for the source coordinate system
-   * @param target_cs enum for the target coordinate system
-   * @param segment_nr The segment number of the desired link. If not specified,
-   * the last segment of the chain is used.
-   */
-  void transform(KDL::Wrench &source_wrench, KDL::JntArray *q,
-                 CoordinateSystem source_cs, CoordinateSystem target_cs,
-                 int segment_nr = -1);
+void transformSdot(Freddy *rob, std::string source_frame, std::string target_frame, double *s_dot,
+                   double *s_dot_out);
 
-  /**
-   * @brief Converts a KDL::Jacobian from one frame to another.
-   * @param source_jacobian The KDL::Jacobian to convert.
-   * @param q A pointer to a KDL::JntArray object representing the robot's joint
-   * positions.
-   * @param source_cs enum for the source coordinate system
-   * @param target_cs enum for the target coordinate system
-   * @param segment_nr The segment number of the desired link. If not specified,
-   * the last segment of the chain is used.
-   */
-  void transform(KDL::Jacobian &source_jacobian, KDL::JntArray *q,
-                 CoordinateSystem source_cs, CoordinateSystem target_cs,
-                 int segment_nr = -1);
+void transform_with_frame(double *source_frame, double *transform, double *transformed_frame);
 
-  /**
-   * @brief Converts a KDL::JntArray from EE frame to base frame.
-   * @param source_jnt_array The KDL::JntArray to convert.
-   * @param q A pointer to a KDL::JntArray object representing the robot's joint
-   * positions.
-   * @param source_cs enum for the source coordinate system
-   * @param target_cs enum for the target coordinate system
-   * @param segment_nr The segment number of the desired link. If not specified,
-   * the last segment of the chain is used.
-   */
-  void transform(KDL::JntArray &source_jnt_array, KDL::JntArray *q,
-                 CoordinateSystem source_cs, CoordinateSystem target_cs,
-                 int segment_nr = -1);
-
- private:
-  KDL::Chain *_chain;
-  KDL::ChainFkSolverPos_recursive *_fksolver;
-};
+void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain, int &link_id);
 
 #endif  // TF_UTILS_HPP

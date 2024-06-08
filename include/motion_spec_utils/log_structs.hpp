@@ -88,13 +88,15 @@ struct LogManipulatorData
   // double q[7];
   // double q_dot[7];
   double f_tool_measured[6]{};
-  double tool_pose[6]{};
+  double tool_pose[7]{};
   double tool_twist[6]{};
   // double tool_acc_twist[6];
 
   // elbow
-  double elbow_pose[6]{};
-  double elbow_twist[6]{};
+  double elbow_pose[7]{};
+
+  // arm_base
+  double arm_base_pose[7]{};
 
   // achd info
   double beta[6]{};
@@ -114,11 +116,12 @@ struct LogManipulatorData
 
     // elbow
     std::memcpy(this->elbow_pose, rob->state->s[rob->state->ns - 4], sizeof(this->elbow_pose));
-    std::memcpy(this->elbow_twist, rob->state->s_dot[rob->state->ns - 4],
-                sizeof(this->elbow_twist));
+
+    // arm_base
+    std::memcpy(this->arm_base_pose, rob->state->s[rob->state->ns - 8], sizeof(this->arm_base_pose));
   }
 
-  void populateAchdData(double *beta, double *tau_command, double *f_tool_command, double *q_ddot)
+  void populateAchdData(double *beta, double *tau_command, double *f_tool_command)
   {
     std::memcpy(this->tau_command, tau_command, sizeof(this->tau_command));
 
@@ -139,39 +142,10 @@ struct LogManipulatorData
   }
 
   void populate(Manipulator<kinova_mediator> *rob, double *beta, double *tau_command,
-                double *f_tool_command, double *q_ddot)
+                double *f_tool_command)
   {
     populateManipulatorData(rob);
-    populateAchdData(beta, tau_command, f_tool_command, q_ddot);
-  }
-};
-
-struct LogMobileBaseData
-{
-  // mobile base info
-  double pivot_angles[4];
-  double platform_force[3];
-  double tau_command[8];
-
-  double x_platform[3];
-  double xd_platform[3];
-
-  // add methods to populate the data
-  void populateMobileBaseData(RobileBase *rob)
-  {
-    std::memcpy(this->pivot_angles, rob->state->pivot_angles, sizeof(this->pivot_angles));
-  }
-
-  void setPlatformData(double *x_platform, double *xd_platform)
-  {
-    std::memcpy(this->x_platform, x_platform, sizeof(this->x_platform));
-    std::memcpy(this->xd_platform, xd_platform, sizeof(this->xd_platform));
-  }
-
-  void populateSolverData(double *platform_force, double *tau_command)
-  {
-    std::memcpy(this->platform_force, platform_force, sizeof(this->platform_force));
-    std::memcpy(this->tau_command, tau_command, sizeof(this->tau_command));
+    populateAchdData(beta, tau_command, f_tool_command);
   }
 };
 
@@ -206,6 +180,7 @@ struct LogManipulatorDataVector
             "ee_s_x,ee_s_y,ee_s_z,ee_s_qx,ee_s_qy,ee_s_qz,ee_s_qw,"
             "ee_twist_x,ee_twist_y,ee_twist_z,ee_twist_qx,ee_twist_qy,ee_twist_qz"
             "elbow_s_x,elbow_s_y,elbow_s_z,elbow_s_qx,elbow_s_qy,elbow_s_qz,elbow_s_qw,"
+            "arm_base_s_x,arm_base_s_y,arm_base_s_z,arm_base_s_qx,arm_base_s_qy,arm_base_s_qz,arm_base_s_qw,"
             "ee_f_e_x, ee_f_e_y, ee_f_e_z, ee_f_e_qx, ee_f_e_qy, ee_f_e_qz,"
             "ee_beta_x,ee_beta_y,ee_beta_z,ee_beta_qx,ee_beta_qy,ee_beta_qz,"
             "tau_c_1,tau_c_2,tau_c_3,tau_c_4,tau_c_5,tau_c_6,tau_c_7,"
@@ -219,10 +194,10 @@ struct LogManipulatorDataVector
   }
 
   void addManipulatorData(Manipulator<kinova_mediator> *rob, double *beta, double *tau_command,
-                          double *f_tool_command, double *q_ddot)
+                          double *f_tool_command)
   {
     LogManipulatorData data;
-    data.populate(rob, beta, tau_command, f_tool_command, q_ddot);
+    data.populate(rob, beta, tau_command, f_tool_command);
     this->log_data.push_back(data);
 
     if (this->log_data.size() >= 100)
@@ -237,10 +212,10 @@ struct LogManipulatorDataVector
     {
       // append all the data to a string
       std::stringstream ss;
-      appendArrayToStream(ss, this->log_data[i].tool_pose, 6);
+      appendArrayToStream(ss, this->log_data[i].tool_pose, 7);
       appendArrayToStream(ss, this->log_data[i].tool_twist, 6);
-      appendArrayToStream(ss, this->log_data[i].elbow_pose, 6);
-      appendArrayToStream(ss, this->log_data[i].elbow_twist, 6);
+      appendArrayToStream(ss, this->log_data[i].elbow_pose, 7);
+      appendArrayToStream(ss, this->log_data[i].arm_base_pose, 7);
       appendArrayToStream(ss, this->log_data[i].f_tool_measured, 6);
       appendArrayToStream(ss, this->log_data[i].beta, 6);
       appendArrayToStream(ss, this->log_data[i].tau_command, 7);
@@ -251,6 +226,35 @@ struct LogManipulatorDataVector
     }
     // clear the data
     this->log_data.clear();
+  }
+};
+
+struct LogMobileBaseData
+{
+  // mobile base info
+  double pivot_angles[4];
+  double platform_force[3];
+  double tau_command[8];
+
+  double x_platform[3];
+  double xd_platform[3];
+
+  // add methods to populate the data
+  void populateMobileBaseData(RobileBase *rob)
+  {
+    std::memcpy(this->pivot_angles, rob->state->pivot_angles, sizeof(this->pivot_angles));
+  }
+
+  void setPlatformData(double *x_platform, double *xd_platform)
+  {
+    std::memcpy(this->x_platform, x_platform, sizeof(this->x_platform));
+    std::memcpy(this->xd_platform, xd_platform, sizeof(this->xd_platform));
+  }
+
+  void populateSolverData(double *platform_force, double *tau_command)
+  {
+    std::memcpy(this->platform_force, platform_force, sizeof(this->platform_force));
+    std::memcpy(this->tau_command, tau_command, sizeof(this->tau_command));
   }
 };
 

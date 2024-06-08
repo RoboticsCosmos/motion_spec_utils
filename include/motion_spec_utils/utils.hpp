@@ -71,8 +71,7 @@
 #include <kelo_kindyn/functions/kelo_drive.h>
 #include <kelo_kindyn/functions/kelo_wheel.h>
 
-// TODO: should not be here
-#include "motion_spec_utils/robot_structs.hpp"
+#include "motion_spec_utils/tf_utils.hpp"
 
 /**
  * @brief Initializes the robot state struct.
@@ -151,34 +150,6 @@ extern void add(double *arr1, double *arr2, double *result, size_t size);
  */
 void updateQandQdot(double *q_ddot, double dt, ManipulatorState *rob);
 
-/**
- * @brief Solves the hybrid dynamics problem for a given robot chain.
- * @param rob The robot state struct.
- * @param robot_chain The KDL::Chain object representing the robot's kinematic chain.
- * @param num_constraints The number of constraints.
- * @param root_acceleration The root acceleration.
- * @param alpha The alpha matrix.
- * @param beta The beta vector.
- * @param ext_wrench The external wrenches.
- * @param tau_ff The feedforward torques.
- * @param predicted_acc [out] The output predicted joint accelerations.
- * @param constraint_tau [out] The output constraint torques.
- */
-void achd_solver(Freddy *rob, std::string root_link, std::string tip_link, int num_constraints,
-                 double *root_acceleration, double **alpha, double *beta, double *tau_ff,
-                 double *predicted_acc, double *constraint_tau);
-
-void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
-                      double **ext_wrenches, double *constraint_tau);
-
-void rne_solver(Freddy *rob, std::string root_link, std::string tip_link,
-                double *root_acceleration, double **ext_wrench, double *constraint_tau);
-
-void base_fd_solver(Freddy *rob, double *platform_force, double *wheel_torques);
-
-void wrench_estimator(Freddy *rob, std::string root_link, std::string tip_link,
-                      double *root_acceleration, double *tau, double *tool_wrench);
-
 void getLinkIdFromChain(KDL::Chain &chain, std::string link_name, int &link_id);
 
 template <typename MediatorType>
@@ -223,7 +194,7 @@ void findNormalizedVector(const double *vec, double *normalized_vec);
 void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string to_ent,
                      std::string asb_ent, const double signal, double *vec);
 
-void get_robot_data(Freddy *rob, double dt = 0.001);
+void get_robot_data(Freddy *rob, double dt);
 
 void print_robot_data(Freddy *rob);
 
@@ -234,39 +205,6 @@ void get_robot_data_sim(Freddy *freddy, double *kinova_left_predicted_acc,
                         double *kinova_right_predicted_acc, double time_step);
 
 void set_init_sim_data(Freddy *freddy);
-
-void transform_alpha(Freddy *rob, std::string source_frame, std::string target_frame,
-                     double **alpha, int nc, double **transformed_alpha);
-
-void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree, std::string source_frame,
-                     std::string target_frame, double **alpha, int nc, double **transformed_alpha);
-
-void transform_alpha_beta(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
-                          std::string source_frame, std::string target_frame, double **alpha,
-                          double *beta, int nc, double **transformed_alpha,
-                          double *transformed_beta);
-
-void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string target_frame,
-                          double **alpha, double *beta, int nc, double **transformed_alpha,
-                          double *transformed_beta);
-
-void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, double *wrench,
-                      double *transformed_wrench);
-
-void transformS(Freddy *rob, std::string source_frame, std::string target_frame, double *s,
-                double *s_out);
-
-void transformSdot(Freddy *rob, std::string source_frame, std::string target_frame, double *s_dot,
-                   double *s_dot_out);
-
-void transform_with_frame(double *source_frame, double *transform, double *transformed_frame);
-
-void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constraints,
-                             double *root_acceleration, double **alpha, double *beta,
-                             double *tau_ff, double *predicted_acc, double *constraint_tau);
-
-void rne_solver_manipulator(Manipulator<kinova_mediator> *rob, double *root_acceleration,
-                            double **ext_wrench, double *constraint_tau);
 
 void compute_kelo_platform_velocity(Freddy *rob);
 

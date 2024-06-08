@@ -34,11 +34,20 @@
 #include <vector>
 
 #include "kdl/chain.hpp"
-#include "kdl/chainfksolver.hpp"
 #include "kdl/chainfksolverpos_recursive.hpp"
-#include "kdl/chainidsolver_vereshchagin.hpp"
+#include "kdl/chainfksolvervel_recursive.hpp"
+#include "kdl/chainhdsolver_vereshchagin.hpp"
+#include "kdl/chainhdsolver_vereshchagin_fext.hpp"
+#include "kdl/chainidsolver_recursive_newton_euler.hpp"
+#include "kdl/chainexternalwrenchestimator.hpp"
+#include "kdl/frames.hpp"
 #include "kdl/jacobian.hpp"
 #include "kdl/jntarray.hpp"
+#include "kdl/frames_io.hpp"
+#include "kdl/kinfam_io.hpp"
+#include "kdl/tree.hpp"
+#include "kdl_parser/kdl_parser.hpp"
+#include "motion_spec_utils/robot_structs.hpp"
 
 
 /**
@@ -54,6 +63,27 @@
  * @param predicted_acc [out] The output predicted joint accelerations.
  * @param constraint_tau [out] The output constraint torques.
  */
+void achd_solver(Freddy *rob, std::string root_link, std::string tip_link, int num_constraints,
+                 double *root_acceleration, double **alpha, double *beta, double *tau_ff,
+                 double *predicted_acc, double *constraint_tau);
+
+void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
+                      double **ext_wrenches, double *constraint_tau);
+
+void rne_solver(Freddy *rob, std::string root_link, std::string tip_link,
+                double *root_acceleration, double **ext_wrench, double *constraint_tau);
+
+void base_fd_solver(Freddy *rob, double *platform_force, double *wheel_torques);
+
+void wrench_estimator(Freddy *rob, std::string root_link, std::string tip_link,
+                      double *root_acceleration, double *tau, double *tool_wrench);
+
+void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constraints,
+                             double *root_acceleration, double **alpha, double *beta,
+                             double *tau_ff, double *predicted_acc, double *constraint_tau);
+
+void rne_solver_manipulator(Manipulator<kinova_mediator> *rob, double *root_acceleration,
+                            double **ext_wrench, double *constraint_tau);
 
 
 #endif  // SOLVER_UTILS_HPP

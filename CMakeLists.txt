@@ -50,6 +50,27 @@ target_include_directories(math_utils PUBLIC
 )
 target_link_libraries(math_utils orocos-kdl)
 
+
+add_library(solver_utils SHARED src/solver_utils.cpp)
+target_include_directories(solver_utils PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(solver_utils 
+  kdl_parser  
+  orocos-kdl
+)
+
+add_library(tf_utils SHARED src/tf_utils.cpp)
+target_include_directories(tf_utils PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(tf_utils 
+  kdl_parser  
+  orocos-kdl
+)
+
 add_library(mutils SHARED src/utils.cpp)
 target_include_directories(mutils PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -63,18 +84,12 @@ target_link_libraries(mutils
   pthread
   kelo_motion_control
   kelo_kindyn
+  tf_utils
 )
-
-add_library(solver_utils SHARED src/solver_utils.cpp)
-target_include_directories(solver_utils PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-)
-target_link_libraries(solver_utils orocos-kdl)
 
 # install
 install(
-  TARGETS math_utils solver_utils mutils
+  TARGETS math_utils solver_utils tf_utils mutils
   EXPORT ${PROJECT_NAME}-targets
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
