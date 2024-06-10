@@ -682,8 +682,66 @@ void get_robot_data(Freddy *freddy, double dt)
       freddy->mobile_base->state->wheel_encoder_values, freddy->mobile_base->state->qd_wheel);
 
   compute_kelo_platform_velocity(freddy);
+  // ckpv(freddy, dt);
+  // printf("[base velocities]: ");
+  // print_array(freddy->mobile_base->state->xd_platform, 3);
+
   compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, dt,
                              freddy->mobile_base->state->x_platform);
+
+  std::cout << "odom: " << freddy->mobile_base->state->x_platform[0] << " " << freddy->mobile_base->state->x_platform[1] << " "
+              << RAD2DEG(freddy->mobile_base->state->x_platform[2]) << std::endl;
+}
+
+void ckpv(Freddy *rob, double dt)
+{
+  // initialize the variables
+  double vx, vy, va;
+  vx = 0;
+  vy = 0;
+  va = 0;
+
+  int nWheels = rob->mobile_base->mediator->kelo_base_config->nWheels;
+  double r_w = rob->mobile_base->mediator->kelo_base_config->radius;
+  double s_d_ratio = rob->mobile_base->mediator->kelo_base_config->castor_offset /
+                     (rob->mobile_base->mediator->kelo_base_config->half_wheel_distance * 2);
+
+  for (int i = 0; i < nWheels; i++)
+  {
+    double wl = (rob->mobile_base->state->wheel_encoder_values[2 * i] - rob->mobile_base->state->prev_wheel_encoder_values[2 * i]) / dt;
+    double wr = -(rob->mobile_base->state->wheel_encoder_values[2 * i + 1] - rob->mobile_base->state->prev_wheel_encoder_values[2 * i + 1]) / dt;
+    
+    rob->mobile_base->state->prev_wheel_encoder_values[2 * i] = rob->mobile_base->state->wheel_encoder_values[2 * i];
+    rob->mobile_base->state->prev_wheel_encoder_values[2 * i + 1] = rob->mobile_base->state->wheel_encoder_values[2 * i + 1];
+    
+    double theta =
+        rob->mobile_base->state->pivot_angles[i];  // encoder_offset can be obtained from the yaml
+                                                   // file or smartWheelDriver class
+
+    vx -= r_w * ((wl + wr) * cos(theta));  // + 2 * s_d_ratio * (wl - wr) * sin(theta));
+    vy -= r_w * ((wl + wr) * sin(theta));  // - 2 * s_d_ratio * (wl - wr) * cos(theta));
+
+    double wangle =
+        atan2(rob->mobile_base->mediator->kelo_base_config->wheel_coordinates[2 * i + 1],
+              rob->mobile_base->mediator->kelo_base_config->wheel_coordinates[2 * i]);
+    double d =
+        sqrt(pow(rob->mobile_base->mediator->kelo_base_config->wheel_coordinates[2 * i], 2) +
+             pow(rob->mobile_base->mediator->kelo_base_config->wheel_coordinates[2 * i + 1], 2));
+
+    va += r_w *
+          (2 * (wr - wl) * s_d_ratio * cos(theta - wangle) - (wr + wl) * sin(theta - wangle)) / d;
+
+    // va += r_w * (wr + wl) * sin(theta - wangle) / d;
+    // va += 4*swData->gyro_y;
+  }
+  // averaging the wheel velocity
+  vx = vx / nWheels / 2;
+  vy = vy / nWheels / 2;
+  va = va / nWheels / 2;
+
+  rob->mobile_base->state->xd_platform[0] = vx;
+  rob->mobile_base->state->xd_platform[1] = vy;
+  rob->mobile_base->state->xd_platform[2] = va;
 }
 
 void compute_kelo_platform_velocity(Freddy *rob)

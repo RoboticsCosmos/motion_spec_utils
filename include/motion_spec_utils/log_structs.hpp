@@ -7,6 +7,14 @@
 
 #include "motion_spec_utils/robot_structs.hpp"
 
+void appendArrayToStream(std::stringstream &ss, double *arr, size_t size)
+{
+  for (size_t i = 0; i < size; i++)
+  {
+    ss << arr[i] << ",";
+  }
+}
+
 struct LogControlData
 {
   double measured_value;
@@ -24,24 +32,24 @@ struct LogControlData
 
 struct LogControlDataVector
 {
-  const char *control_variable;
+  std::string control_variable;
   std::vector<LogControlData> control_data;
 
-  const char *log_dir;
-  char *filename;
+  std::string log_dir;
+  std::string filename;
   FILE *file;
 
   // constructor
-  LogControlDataVector(const char *control_variable, const char *log_dir)
+  LogControlDataVector(std::string control_variable, std::string log_dir)
   {
     this->control_variable = control_variable;
     this->log_dir = log_dir;
 
     // create the filename
-    sprintf(this->filename, "%s/control_log_%s.csv", log_dir, control_variable);
+    this->filename = log_dir + "/control_log_" + control_variable + ".csv";
 
     // create the file
-    this->file = fopen(this->filename, "w");
+    this->file = fopen(this->filename.c_str(), "w");
     if (this->file == NULL)
     {
       std::cerr << "Error opening file: " << this->filename << std::endl;
@@ -118,7 +126,8 @@ struct LogManipulatorData
     std::memcpy(this->elbow_pose, rob->state->s[rob->state->ns - 4], sizeof(this->elbow_pose));
 
     // arm_base
-    std::memcpy(this->arm_base_pose, rob->state->s[rob->state->ns - 8], sizeof(this->arm_base_pose));
+    std::memcpy(this->arm_base_pose, rob->state->s[rob->state->ns - 8],
+                sizeof(this->arm_base_pose));
   }
 
   void populateAchdData(double *beta, double *tau_command, double *f_tool_command)
@@ -151,24 +160,24 @@ struct LogManipulatorData
 
 struct LogManipulatorDataVector
 {
-  const char *arm_name;
+  std::string arm_name;
   std::vector<LogManipulatorData> log_data;
 
-  const char *log_dir;
-  char *filename;
+  std::string log_dir;
+  std::string filename;
   FILE *file;
 
   // constructor
-  LogManipulatorDataVector(const char *arm_name, const char *log_dir)
+  LogManipulatorDataVector(std::string arm_name, std::string log_dir)
   {
     this->log_dir = log_dir;
     this->arm_name = arm_name;
 
     // create the filename
-    sprintf(this->filename, "%s/%s_manipulator_log.csv", log_dir, arm_name);
+    this->filename = log_dir + "/" + arm_name + "_log.csv";
 
     // create the file
-    this->file = fopen(this->filename, "w");
+    this->file = fopen(this->filename.c_str(), "w");
     if (this->file == NULL)
     {
       std::cerr << "Error opening file: " << this->filename << std::endl;
@@ -180,7 +189,8 @@ struct LogManipulatorDataVector
             "ee_s_x,ee_s_y,ee_s_z,ee_s_qx,ee_s_qy,ee_s_qz,ee_s_qw,"
             "ee_twist_x,ee_twist_y,ee_twist_z,ee_twist_qx,ee_twist_qy,ee_twist_qz"
             "elbow_s_x,elbow_s_y,elbow_s_z,elbow_s_qx,elbow_s_qy,elbow_s_qz,elbow_s_qw,"
-            "arm_base_s_x,arm_base_s_y,arm_base_s_z,arm_base_s_qx,arm_base_s_qy,arm_base_s_qz,arm_base_s_qw,"
+            "arm_base_s_x,arm_base_s_y,arm_base_s_z,arm_base_s_qx,arm_base_s_qy,arm_base_s_qz,arm_"
+            "base_s_qw,"
             "ee_f_e_x, ee_f_e_y, ee_f_e_z, ee_f_e_qx, ee_f_e_qy, ee_f_e_qz,"
             "ee_beta_x,ee_beta_y,ee_beta_z,ee_beta_qx,ee_beta_qy,ee_beta_qz,"
             "tau_c_1,tau_c_2,tau_c_3,tau_c_4,tau_c_5,tau_c_6,tau_c_7,"
@@ -262,20 +272,20 @@ struct LogMobileBaseDataVector
 {
   std::vector<LogMobileBaseData> log_data;
 
-  const char *log_dir;
-  char *filename;
+  std::string log_dir;
+  std::string filename;
   FILE *file;
 
   // constructor
-  LogMobileBaseDataVector(const char *log_dir)
+  LogMobileBaseDataVector(std::string log_dir)
   {
     this->log_dir = log_dir;
 
     // create the filename
-    sprintf(this->filename, "%s/mobile_base_log.csv", log_dir);
+    this->filename = log_dir + "/mobile_base_log.csv";
 
     // create the file
-    this->file = fopen(this->filename, "w");
+    this->file = fopen(this->filename.c_str(), "w");
     if (this->file == NULL)
     {
       std::cerr << "Error opening file: " << this->filename << std::endl;
@@ -328,13 +338,5 @@ struct LogMobileBaseDataVector
     this->log_data.clear();
   }
 };
-
-void appendArrayToStream(std::stringstream &ss, double *arr, size_t size)
-{
-  for (size_t i = 0; i < size; i++)
-  {
-    ss << arr[i] << ",";
-  }
-}
 
 #endif  // LOG_STRUCTS_HPP

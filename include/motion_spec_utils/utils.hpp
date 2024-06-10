@@ -93,6 +93,8 @@ void free_mobile_base(MobileBase<Robile> *base);
 
 void free_robot_data(Freddy *rob);
 
+void ckpv(Freddy *rob, double dt);
+
 /**
  * @brief Initializes the robot state struct.
  * @param num_joints The number of joints.

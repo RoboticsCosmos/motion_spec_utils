@@ -57,8 +57,9 @@ target_include_directories(solver_utils PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(solver_utils 
-  kdl_parser  
+  kdl_parser
   orocos-kdl
+  kelo_motion_control
 )
 
 add_library(tf_utils SHARED src/tf_utils.cpp)
@@ -69,6 +70,7 @@ target_include_directories(tf_utils PUBLIC
 target_link_libraries(tf_utils 
   kdl_parser  
   orocos-kdl
+  kelo_motion_control
 )
 
 add_library(mutils SHARED src/utils.cpp)

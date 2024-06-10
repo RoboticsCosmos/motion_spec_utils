@@ -23,7 +23,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
+extern "C"
+{
+#include "kelo_motion_control/mediator.h"
+}
 #include "motion_spec_utils/solver_utils.hpp"
 
 void rne_solver(Freddy *rob, std::string root_link, std::string tip_link,
