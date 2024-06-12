@@ -172,6 +172,17 @@ void computeDistance(std::string *between_ents, std::string asb, Freddy *rob, do
 void computeDistance1D(std::string *between_ents, double *axis, std::string asb, Freddy *rob,
                        double &distance);
 
+void getMagnitude(double *vec, size_t size, double &magnitude);
+
+void crossProduct(double *vec1, double*vec2, size_t size, double *result);
+
+void dotProduct(double *vec1, double *vec2, size_t size, double &result);
+
+void getLine(Freddy *rob, std::string *entities, size_t num_entities, double *direction);
+
+void getAngleBetweenLines(Freddy *rob, double *line1, double *line2, double *angle_about_vec,
+                          double &angle);
+
 void getLinkForce(std::string applied_by, std::string applied_to, std::string asb, double *vec,
                   Freddy *rob, double &force);
 

@@ -167,7 +167,7 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
 
   // initialize the mediators
   int r = 0;
-  // freddy->kinova_left->mediator->initialize(0, 0, 0.0);
+  freddy->kinova_left->mediator->initialize(0, 0, 0.0);
   // r = freddy->kinova_left->mediator->set_control_mode(2);
 
   // if (r != 0)
@@ -483,6 +483,104 @@ void computeDistance1D(std::string *between_ents, double *axis, std::string asb,
   raise(SIGINT);
 }
 
+void getLine(Freddy *rob, std::string *entities, size_t num_entities, double *direction)
+{
+  if (num_entities < 2)
+  {
+    std::cerr << "[get_line] Need at least 2 entities to find a line" << std::endl;
+  }
+
+  // get the position of the entities
+  double **positions = new double *[num_entities];
+  for (size_t i = 0; i < num_entities; i++)
+  {
+    double pose[7]{};
+    getLinkSFromRob(entities[i], rob, pose);
+
+    // get the position
+    positions[i] = new double[3]{};
+    for (size_t j = 0; j < 3; j++)
+    {
+      positions[i][j] = pose[j];
+    }
+  }
+
+  // find the line passing through the entities
+  for (size_t i = 0; i < 3; i++)
+  {
+    direction[i] = positions[1][i] - positions[0][i];
+  }
+
+  // normalize the direction vector
+  findNormalizedVector(direction, direction);
+}
+
+void dotProduct(double *vec1, double *vec2, size_t size, double &result)
+{
+  result = 0.0;
+  for (size_t i = 0; i < size; i++)
+  {
+    result += vec1[i] * vec2[i];
+  }
+}
+
+void crossProduct(double *vec1, double*vec2, size_t size, double *result)
+{
+  result[0] = vec1[1] * vec2[2] - vec1[2] * vec2[1];
+  result[1] = vec1[2] * vec2[0] - vec1[0] * vec2[2];
+  result[2] = vec1[0] * vec2[1] - vec1[1] * vec2[0];
+}
+
+void getMagnitude(double *vec, size_t size, double &magnitude)
+{
+  magnitude = 0.0;
+  for (size_t i = 0; i < size; i++)
+  {
+    magnitude += vec[i] * vec[i];
+  }
+  magnitude = sqrt(magnitude);
+}
+
+void getAngleBetweenLines(Freddy *rob, double *line1, double *line2, double *angle_about_vec,
+                          double &angle)
+{
+  // based on the angle_about_vec, project the lines onto the plane perpendicular to the vector
+
+  double *proj_line1 = new double[3]{};
+  double *proj_line2 = new double[3]{};
+
+  double angle_about_vec_angular[3]{};
+  for (size_t i = 3; i < 6; i++)
+  {
+    angle_about_vec_angular[i - 3] = angle_about_vec[i];
+  }
+
+  double dot_product = 0.0;
+  dotProduct(line1, angle_about_vec_angular, 3, dot_product);
+
+  for (size_t i = 0; i < 3; i++)
+  {
+    proj_line1[i] = line1[i] - dot_product * angle_about_vec_angular[i];
+    proj_line2[i] = line2[i] - dot_product * angle_about_vec_angular[i];
+  }
+
+  // find the angle between the projected lines
+  double dot_product_proj = 0.0;
+  dotProduct(proj_line1, proj_line2, 3, dot_product_proj);
+
+  double cross_product[3]{};
+  crossProduct(proj_line1, proj_line2, 3, cross_product);
+
+  double cross_product_magnitude = 0.0;
+  getMagnitude(cross_product, 3, cross_product_magnitude);
+
+  angle = atan2(cross_product_magnitude, dot_product_proj);
+
+  // free memory
+  delete[] proj_line1;
+  delete[] proj_line2;
+}
+
 void getLinkPosition(std::string link_name, std::string as_seen_by, std::string with_respect_to,
                      double *vec, Freddy *rob, double &out_position)
 {
@@ -667,9 +765,9 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
 
 void get_robot_data(Freddy *freddy, double dt)
 {
-  // get_manipulator_data(freddy->kinova_left);
-  // update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
-  //                          &freddy->tree);
+  get_manipulator_data(freddy->kinova_left);
+  update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
+                           &freddy->tree);
 
   get_manipulator_data(freddy->kinova_right);
   update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
@@ -689,8 +787,9 @@ void get_robot_data(Freddy *freddy, double dt)
   compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, dt,
                              freddy->mobile_base->state->x_platform);
 
-  std::cout << "odom: " << freddy->mobile_base->state->x_platform[0] << " " << freddy->mobile_base->state->x_platform[1] << " "
-              << RAD2DEG(freddy->mobile_base->state->x_platform[2]) << std::endl;
+  std::cout << "odom: " << freddy->mobile_base->state->x_platform[0] << " "
+            << freddy->mobile_base->state->x_platform[1] << " "
+            << RAD2DEG(freddy->mobile_base->state->x_platform[2]) << std::endl;
 }
 
 void ckpv(Freddy *rob, double dt)
@@ -708,12 +807,18 @@ void ckpv(Freddy *rob, double dt)
 
   for (int i = 0; i < nWheels; i++)
   {
-    double wl = (rob->mobile_base->state->wheel_encoder_values[2 * i] - rob->mobile_base->state->prev_wheel_encoder_values[2 * i]) / dt;
-    double wr = -(rob->mobile_base->state->wheel_encoder_values[2 * i + 1] - rob->mobile_base->state->prev_wheel_encoder_values[2 * i + 1]) / dt;
-    
-    rob->mobile_base->state->prev_wheel_encoder_values[2 * i] = rob->mobile_base->state->wheel_encoder_values[2 * i];
-    rob->mobile_base->state->prev_wheel_encoder_values[2 * i + 1] = rob->mobile_base->state->wheel_encoder_values[2 * i + 1];
-    
+    double wl = (rob->mobile_base->state->wheel_encoder_values[2 * i] -
+                 rob->mobile_base->state->prev_wheel_encoder_values[2 * i]) /
+                dt;
+    double wr = -(rob->mobile_base->state->wheel_encoder_values[2 * i + 1] -
+                  rob->mobile_base->state->prev_wheel_encoder_values[2 * i + 1]) /
+                dt;
+
+    rob->mobile_base->state->prev_wheel_encoder_values[2 * i] =
+        rob->mobile_base->state->wheel_encoder_values[2 * i];
+    rob->mobile_base->state->prev_wheel_encoder_values[2 * i + 1] =
+        rob->mobile_base->state->wheel_encoder_values[2 * i + 1];
+
     double theta =
         rob->mobile_base->state->pivot_angles[i];  // encoder_offset can be obtained from the yaml
                                                    // file or smartWheelDriver class
@@ -819,7 +924,20 @@ void compute_kelo_platform_pose(double *xd_platform, double dt, double *x_platfo
   // transform displacement to odom frame
   x_platform[0] += dx * cos(x_platform[2]) - dy * sin(x_platform[2]);
   x_platform[1] += dx * sin(x_platform[2]) + dy * cos(x_platform[2]);
-  x_platform[2] = norm(x_platform[2] + xd_platform[2] * dt);
+  x_platform[2] = norm(x_platform[2] + xd_platform[2] * (dt * 5));
+
+  // // compute linear position components x, y and angular component theta
+  // x_platform[0] += xd_platform[0] * dt * cos(x_platform[2]) - xd_platform[1] * dt *
+  // sin(x_platform[2]); x_platform[1] += xd_platform[0] * dt * sin(x_platform[2]) + xd_platform[1]
+  // * dt * cos(x_platform[2]); x_platform[2] += xd_platform[2] * 0.07;
+
+  // // normalize the angle between -pi and pi
+  // x_platform[2] = fmod(x_platform[2] + M_PI, 2 * M_PI);
+  // if (x_platform[2] < 0)
+  // {
+  //   x_platform[2] += 2 * M_PI;
+  // }
+  // x_platform[2] -= M_PI;
 }
 
 void print_matrix2(int rows, int cols, const double *a)
