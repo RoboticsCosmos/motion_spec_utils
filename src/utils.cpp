@@ -524,7 +524,7 @@ void dotProduct(double *vec1, double *vec2, size_t size, double &result)
   }
 }
 
-void crossProduct(double *vec1, double*vec2, size_t size, double *result)
+void crossProduct(double *vec1, double *vec2, size_t size, double *result)
 {
   result[0] = vec1[1] * vec2[2] - vec1[2] * vec2[1];
   result[1] = vec1[2] * vec2[0] - vec1[0] * vec2[2];
@@ -587,6 +587,14 @@ void getLinkPosition(std::string link_name, std::string as_seen_by, std::string 
   double pose[7]{};
   getLinkSFromRob(link_name, rob, pose);
 
+  // *Assumption* - wrt base_link
+  if (with_respect_to != "base_link")
+  {
+    std::cerr << "[getLinkPosition] with-respect-to is not base_link but " << with_respect_to
+              << ", which is not supported!" << std::endl;
+    raise(SIGINT);
+  }
+
   for (size_t i = 0; i < 3; i++)
   {
     if (vec[i] == 1)
@@ -608,6 +616,12 @@ void getLinkQuaternion(std::string link_name, std::string as_seen_by, std::strin
   getLinkSFromRob(link_name, rob, pose);
 
   // *Assumption* - wrt base_link
+  if (with_respect_to != "base_link")
+  {
+    std::cerr << "[getLinkQuaternion] with-respect-to is not base_link but " << with_respect_to
+              << ", which is not supported!" << std::endl;
+    raise(SIGINT);
+  }
 
   if (as_seen_by == "base_link")
   {
@@ -619,6 +633,8 @@ void getLinkQuaternion(std::string link_name, std::string as_seen_by, std::strin
   }
 
   // Transformation to as_seen_by frame
+  std::cerr << "[getLinkQuaternion] Transformation feature not implemented yet" << std::endl;
+  raise(SIGINT);
 }
 
 void getLinkVelocity(std::string link_name, std::string as_seen_by, std::string with_respect_to,
@@ -787,9 +803,9 @@ void get_robot_data(Freddy *freddy, double dt)
   compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, dt,
                              freddy->mobile_base->state->x_platform);
 
-  std::cout << "odom: " << freddy->mobile_base->state->x_platform[0] << " "
-            << freddy->mobile_base->state->x_platform[1] << " "
-            << RAD2DEG(freddy->mobile_base->state->x_platform[2]) << std::endl;
+  // std::cout << "odom: " << freddy->mobile_base->state->x_platform[0] << " "
+  //           << freddy->mobile_base->state->x_platform[1] << " "
+  //           << RAD2DEG(freddy->mobile_base->state->x_platform[2]) << std::endl;
 }
 
 void ckpv(Freddy *rob, double dt)
@@ -1067,6 +1083,17 @@ void get_robot_data_sim(Freddy *freddy, double *kinova_left_predicted_acc,
     update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
                              &freddy->tree);
   }
+}
+
+void computeQuaternionEqualityError(double *measured, double *ref, double *signal) 
+{
+  KDL::Rotation rot_measured = KDL::Rotation::Quaternion(measured[0], measured[1], measured[2], measured[3]);
+  KDL::Rotation rot_ref = KDL::Rotation::Quaternion(ref[0], ref[1], ref[2], ref[3]);
+
+  KDL::Vector diff = KDL::diff(rot_ref, rot_measured);
+  signal[0] = diff.x();
+  signal[1] = diff.y();
+  signal[2] = diff.z();
 }
 
 void set_init_sim_data(Freddy *freddy)
