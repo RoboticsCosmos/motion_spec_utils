@@ -800,7 +800,7 @@ void get_robot_data(Freddy *freddy, double dt)
   // printf("[base velocities]: ");
   // print_array(freddy->mobile_base->state->xd_platform, 3);
 
-  compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, dt,
+  compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, 0.05 / 3.25,
                              freddy->mobile_base->state->x_platform);
 
   // std::cout << "odom: " << freddy->mobile_base->state->x_platform[0] << " "
@@ -940,7 +940,7 @@ void compute_kelo_platform_pose(double *xd_platform, double dt, double *x_platfo
   // transform displacement to odom frame
   x_platform[0] += dx * cos(x_platform[2]) - dy * sin(x_platform[2]);
   x_platform[1] += dx * sin(x_platform[2]) + dy * cos(x_platform[2]);
-  x_platform[2] = norm(x_platform[2] + xd_platform[2] * (dt * 5));
+  x_platform[2] = norm(x_platform[2] + xd_platform[2] * (dt));
 
   // // compute linear position components x, y and angular component theta
   // x_platform[0] += xd_platform[0] * dt * cos(x_platform[2]) - xd_platform[1] * dt *
