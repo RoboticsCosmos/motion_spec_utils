@@ -589,10 +589,17 @@ void base_fd_solver(Freddy *rob, double *platform_forces, double *wheel_torques)
 
   TorqueControlState *torque_control_state = new TorqueControlState();
   init_torque_control_state(torque_control_state, N, M);
-
-  set_platform_force(torque_control_state, platform_forces, N);
-
   set_weight_matrix(torque_control_state, N, M);
+
+  // *Assumption* - platform_forces is a 6D vector with forces in x, y, z and torques about x, y, z
+  double pf[3] = {platform_forces[0], platform_forces[1], platform_forces[5]};
+  std::cout << "pf: ";
+  for (int i = 0; i < 3; i++)
+  {
+    std::cout << pf[i] << ", ";
+  }
+  std::cout << std::endl;
+  set_platform_force(torque_control_state, pf, N);
 
   compute_wheel_torques(rob->mobile_base->mediator->kelo_base_config, torque_control_state,
                         rob->mobile_base->state->pivot_angles, wheel_torques, N, M);

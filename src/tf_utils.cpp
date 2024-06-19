@@ -104,6 +104,79 @@ void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, dou
   }
 }
 
+void transform_wrench2(Freddy *rob, std::string from_ent, std::string to_ent, double *wrench,
+                      double *transformed_wrench)
+{
+  KDL::Chain chain;
+  if (!rob->tree.getChain(from_ent, to_ent, chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+    return;
+  }
+
+  bool forward = true;
+  if (from_ent.find("base_link") == std::string::npos &&
+      to_ent.find("base_link") != std::string::npos)
+  {
+    forward = false;
+  }
+
+  KDL::Frame frame;
+  KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
+
+  KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
+
+  // update q values from the robot state
+  bool is_in_left_chain, is_in_right_chain = false;
+
+  std::string not_base_link = from_ent == "base_link" ? to_ent : from_ent;
+  int link_id = -1;
+  findLinkInChain(not_base_link, &rob->kinova_left->chain, is_in_left_chain, link_id);
+  findLinkInChain(not_base_link, &rob->kinova_right->chain, is_in_right_chain, link_id);
+
+  if (!is_in_left_chain && !is_in_right_chain)
+  {
+    std::cerr << "Link not found in the robot chains" << std::endl;
+    return;
+  }
+
+  ManipulatorState *rob_state =
+      is_in_left_chain ? rob->kinova_left->state : rob->kinova_right->state;
+
+  if (chain.getNrOfJoints() != 0)
+  {
+    if (forward)
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[i];
+      }
+    }
+    else
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[rob_state->nj - i - 1];
+      }
+    }
+  }
+
+  fk_solver_pos.JntToCart(q, frame);
+
+  KDL::Wrench wrench_kdl;
+  for (size_t i = 0; i < 6; i++)
+  {
+    wrench_kdl(i) = wrench[i];
+  }
+
+  KDL::Wrench transformed_wrench_kdl = frame * wrench_kdl;
+
+  for (size_t i = 0; i < 6; i++)
+  {
+    transformed_wrench[i] = transformed_wrench_kdl(i);
+  }
+}
+
 void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree, std::string source_frame,
                      std::string target_frame, double **alpha, int nc, double **transformed_alpha)
 {

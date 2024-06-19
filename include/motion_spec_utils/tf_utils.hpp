@@ -63,6 +63,9 @@ void transform_alpha_beta(Freddy *rob, std::string source_frame, std::string tar
 void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, double *wrench,
                       double *transformed_wrench);
 
+void transform_wrench2(Freddy *rob, std::string from_ent, std::string to_ent, double *wrench,
+                      double *transformed_wrench);
+
 void transformS(Freddy *rob, std::string source_frame, std::string target_frame, double *s,
                 double *s_out);
 

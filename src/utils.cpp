@@ -406,6 +406,13 @@ int set_manipulator_torques(Freddy *rob, std::string root_link, KDL::JntArray *t
   return 0;
 }
 
+void set_mobile_base_torques(Freddy *rob, double *tau_command)
+{
+  // send the torques to the mobile base
+  set_kelo_base_torques(rob->mobile_base->mediator->kelo_base_config,
+                        rob->mobile_base->mediator->ethercat_config, tau_command);
+}
+
 void getLinkSFromRob(std::string link_name, Freddy *rob, double *s)
 {
   // find which robot the link belongs to
@@ -692,11 +699,11 @@ void findVector(std::string from_ent, std::string to_ent, Freddy *rob, double *v
 
   getLinkSFromRob(from_ent, rob, from_s);
 
-  printf("from_s: %s: %f %f %f\n", from_ent.c_str(), from_s[0], from_s[1], from_s[2]);
+  // printf("from_s: %s: %f %f %f\n", from_ent.c_str(), from_s[0], from_s[1], from_s[2]);
 
   getLinkSFromRob(to_ent, rob, to_s);
 
-  printf("to_s: %s: %f %f %f\n", to_ent.c_str(), to_s[0], to_s[1], to_s[2]);
+  // printf("to_s: %s: %f %f %f\n", to_ent.c_str(), to_s[0], to_s[1], to_s[2]);
 
   // TODO: dont use hardcoded values
   // *Assumption* - only linear components
@@ -729,7 +736,23 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
   double *dir_vec = new double[3]{};
   findVector(from_ent, to_ent, rob, dir_vec);
 
-  std::cout << "dir_vec_p: " << dir_vec[0] << " " << dir_vec[1] << " " << dir_vec[2] << std::endl;
+  // std::cout << "dir_vec_p: " << dir_vec[0] << " " << dir_vec[1] << " " << dir_vec[2] << std::endl;
+
+  // update q values from the robot state
+  bool is_in_left_chain, is_in_right_chain = false;
+
+  int link_id = -1;
+  findLinkInChain(asb_ent, &rob->kinova_left->chain, is_in_left_chain, link_id);
+  findLinkInChain(asb_ent, &rob->kinova_right->chain, is_in_right_chain, link_id);
+
+  if (!is_in_left_chain && !is_in_right_chain)
+  {
+    std::cerr << "Link not found in the robot chains" << std::endl;
+    return;
+  }
+
+  ManipulatorState *rob_state =
+      is_in_left_chain ? rob->kinova_left->state : rob->kinova_right->state;
 
   if (asb_ent != "base_link")
   {
@@ -740,21 +763,24 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
       exit(1);
     }
 
+    KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
+
     // check if there are any joints
     if (chain.getNrOfJoints() != 0)
     {
-      std::cerr << "[decompose signal] Feature not implemented yet" << std::endl;
-      exit(1);
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[i];
+      }
     }
 
     KDL::Frame frame;
     KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
 
-    KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
     fk_solver_pos.JntToCart(q, frame);
 
     KDL::Vector vec1(dir_vec[0], dir_vec[1], dir_vec[2]);
-    vec1 = frame * vec1;
+    vec1 = frame.M * vec1;
 
     for (size_t i = 0; i < 3; i++)
     {
@@ -762,7 +788,7 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
     }
   }
 
-  std::cout << "dir_vec: " << dir_vec[0] << " " << dir_vec[1] << " " << dir_vec[2] << std::endl;
+  // std::cout << "dir_vec: " << dir_vec[0] << " " << dir_vec[1] << " " << dir_vec[2] << std::endl;
 
   findNormalizedVector(dir_vec, dir_vec);
 
@@ -772,7 +798,7 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
   }
 
   // TODO: update to only for linear components
-  std::cerr << "[decomposeSignal] should only be for linear, update it" << std::endl;
+  // std::cerr << "[decomposeSignal] should only be for linear, update it" << std::endl;
   for (size_t i = 3; i < 6; i++)
   {
     vec[i] = 0.0;
@@ -789,19 +815,22 @@ void get_robot_data(Freddy *freddy, double dt)
   update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
                            &freddy->tree);
 
-  send_and_receive_data(freddy->mobile_base->mediator->ethercat_config);
   get_kelo_base_state(
       freddy->mobile_base->mediator->kelo_base_config,
       freddy->mobile_base->mediator->ethercat_config, freddy->mobile_base->state->pivot_angles,
       freddy->mobile_base->state->wheel_encoder_values, freddy->mobile_base->state->qd_wheel);
 
   compute_kelo_platform_velocity(freddy);
-  // ckpv(freddy, dt);
-  // printf("[base velocities]: ");
-  // print_array(freddy->mobile_base->state->xd_platform, 3);
+  double odom[3]{};
+  compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, 0.011, odom);
 
-  compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, 0.05 / 3.25,
-                             freddy->mobile_base->state->x_platform);
+  // compensate for the offset from velocity computation
+  KDL::Rotation rot = KDL::Rotation::RotZ(DEG2RAD(-90));
+  KDL::Vector vec(odom[0], odom[1], 0.0);
+  vec = rot * vec;
+  freddy->mobile_base->state->x_platform[0] = vec.x();
+  freddy->mobile_base->state->x_platform[1] = vec.y();
+  freddy->mobile_base->state->x_platform[2] = odom[2];
 
   // std::cout << "odom: " << freddy->mobile_base->state->x_platform[0] << " "
   //           << freddy->mobile_base->state->x_platform[1] << " "
@@ -913,7 +942,7 @@ void compute_kelo_platform_velocity(Freddy *rob)
 
 void compute_kelo_platform_pose(double *xd_platform, double dt, double *x_platform)
 {
-  double dx, dy;
+  double dx, dy = 0.0;
 
   if (fabs(xd_platform[2] > 0.001))
   {
@@ -941,19 +970,6 @@ void compute_kelo_platform_pose(double *xd_platform, double dt, double *x_platfo
   x_platform[0] += dx * cos(x_platform[2]) - dy * sin(x_platform[2]);
   x_platform[1] += dx * sin(x_platform[2]) + dy * cos(x_platform[2]);
   x_platform[2] = norm(x_platform[2] + xd_platform[2] * (dt));
-
-  // // compute linear position components x, y and angular component theta
-  // x_platform[0] += xd_platform[0] * dt * cos(x_platform[2]) - xd_platform[1] * dt *
-  // sin(x_platform[2]); x_platform[1] += xd_platform[0] * dt * sin(x_platform[2]) + xd_platform[1]
-  // * dt * cos(x_platform[2]); x_platform[2] += xd_platform[2] * 0.07;
-
-  // // normalize the angle between -pi and pi
-  // x_platform[2] = fmod(x_platform[2] + M_PI, 2 * M_PI);
-  // if (x_platform[2] < 0)
-  // {
-  //   x_platform[2] += 2 * M_PI;
-  // }
-  // x_platform[2] -= M_PI;
 }
 
 void print_matrix2(int rows, int cols, const double *a)
@@ -1085,9 +1101,10 @@ void get_robot_data_sim(Freddy *freddy, double *kinova_left_predicted_acc,
   }
 }
 
-void computeQuaternionEqualityError(double *measured, double *ref, double *signal) 
+void computeQuaternionEqualityError(double *measured, double *ref, double *signal)
 {
-  KDL::Rotation rot_measured = KDL::Rotation::Quaternion(measured[0], measured[1], measured[2], measured[3]);
+  KDL::Rotation rot_measured =
+      KDL::Rotation::Quaternion(measured[0], measured[1], measured[2], measured[3]);
   KDL::Rotation rot_ref = KDL::Rotation::Quaternion(ref[0], ref[1], ref[2], ref[3]);
 
   KDL::Vector diff = KDL::diff(rot_ref, rot_measured);
