@@ -46,7 +46,7 @@
 #include "motion_spec_utils/robot_structs.hpp"
 
 void transform_alpha(Freddy *rob, std::string source_frame, std::string target_frame,
-                     double **alpha, int nc, double **transformed_alpha);
+                     double alpha[][6], int nc, double transformed_alpha[][6]);
 
 void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree, std::string source_frame,
                      std::string target_frame, double **alpha, int nc, double **transformed_alpha);

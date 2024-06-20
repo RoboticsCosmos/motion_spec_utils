@@ -159,7 +159,7 @@ void get_manipulator_data(Manipulator<MediatorType> *rob);
 
 void update_manipulator_state(ManipulatorState *state, std::string tool_frame, KDL::Tree *tree);
 
-void cap_and_convert_torques(double *tau_command, int num_joints, KDL::JntArray &tau_jnt);
+void cap_and_convert_manipulator_torques(double tau_command[], int num_joints, KDL::JntArray &tau_jnt);
 
 int set_manipulator_torques(Freddy *rob, std::string root_link, KDL::JntArray *tau_command);
 

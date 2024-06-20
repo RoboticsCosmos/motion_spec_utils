@@ -325,7 +325,7 @@ void transform_alpha_beta(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
 }
 
 void transform_alpha(Freddy *rob, std::string source_frame, std::string target_frame,
-                     double **alpha, int nc, double **transformed_alpha)
+                     double alpha[][6], int nc, double transformed_alpha[][6])
 {
   KDL::Chain chain;
   if (!rob->tree.getChain(source_frame, target_frame, chain))

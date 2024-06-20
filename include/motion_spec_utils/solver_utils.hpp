@@ -64,14 +64,14 @@
  * @param constraint_tau [out] The output constraint torques.
  */
 void achd_solver(Freddy *rob, std::string root_link, std::string tip_link, int num_constraints,
-                 double *root_acceleration, double **alpha, double *beta, double *tau_ff,
+                 double *root_acceleration, double alpha[][6], double *beta, double *tau_ff,
                  double *predicted_acc, double *constraint_tau);
 
 void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
-                      double **ext_wrenches, double *constraint_tau);
+                      double ext_wrenches[][6], double *constraint_tau);
 
 void rne_solver(Freddy *rob, std::string root_link, std::string tip_link,
-                double *root_acceleration, double **ext_wrench, double *constraint_tau);
+                double *root_acceleration, double ext_wrenches[][6], double *constraint_tau);
 
 void base_fd_solver(Freddy *rob, double *platform_force, double *wheel_torques);
 

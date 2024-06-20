@@ -108,16 +108,15 @@ void free_mobile_base_state(MobileBaseState *base)
 void free_manipulator(Manipulator<kinova_mediator> *rob)
 {
   free_manipulator_state(rob->state);
+  delete rob->state;
   delete rob->mediator;
 }
 
 void free_mobile_base(MobileBase<Robile> *base)
 {
   free_mobile_base_state(base->state);
+  delete base->state;
   delete base->mediator->ethercat_config;
-  delete[] base->mediator->kelo_base_config->index_to_EtherCAT;
-  delete[] base->mediator->kelo_base_config->wheel_coordinates;
-  delete[] base->mediator->kelo_base_config->pivot_angles_deviation;
 }
 
 void free_robot_data(Freddy *rob)
@@ -166,24 +165,8 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
   initialize_mobile_base_state(freddy->mobile_base->state);
 
   // initialize the mediators
-  int r = 0;
   freddy->kinova_left->mediator->initialize(0, 0, 0.0);
-  // r = freddy->kinova_left->mediator->set_control_mode(2);
-
-  // if (r != 0)
-  // {
-  //   std::cerr << "Failed to set control mode for the left arm" << std::endl;
-  //   exit(1);
-  // }
-
   freddy->kinova_right->mediator->initialize(0, 1, 0.0);
-  // r = freddy->kinova_right->mediator->set_control_mode(2);
-
-  // if (r != 0)
-  // {
-  //   std::cerr << "Failed to set control mode for the right arm" << std::endl;
-  //   exit(1);
-  // }
 
   init_ecx_context(freddy->mobile_base->mediator->ethercat_config);
 
@@ -366,7 +349,7 @@ void update_manipulator_state(ManipulatorState *state, std::string tool_frame, K
   }
 }
 
-void cap_and_convert_torques(double *tau_command, int num_joints, KDL::JntArray &tau_jnt)
+void cap_and_convert_manipulator_torques(double tau_command[], int num_joints, KDL::JntArray &tau_jnt)
 {
   // limit the torques to +/- 30 Nm
   double max_torque = 30.0;
@@ -455,8 +438,8 @@ void getLinkSFromRob(std::string link_name, Freddy *rob, double *s)
 
 void computeDistance(std::string *between_ents, std::string asb, Freddy *rob, double &distance)
 {
-  double *ent1 = new double[6]{};
-  double *ent2 = new double[6]{};
+  double ent1[7]{};
+  double ent2[7]{};
 
   getLinkSFromRob(between_ents[0], rob, ent1);
   getLinkSFromRob(between_ents[1], rob, ent2);
@@ -469,8 +452,8 @@ void computeDistance(std::string *between_ents, std::string asb, Freddy *rob, do
 void computeDistance1D(std::string *between_ents, double *axis, std::string asb, Freddy *rob,
                        double &distance)
 {
-  double *ent1 = new double[6]{};
-  double *ent2 = new double[6]{};
+  double ent1[7]{};
+  double ent2[7]{};
 
   getLinkSFromRob(between_ents[0], rob, ent1);
   getLinkSFromRob(between_ents[1], rob, ent2);
@@ -520,6 +503,13 @@ void getLine(Freddy *rob, std::string *entities, size_t num_entities, double *di
 
   // normalize the direction vector
   findNormalizedVector(direction, direction);
+
+  // free memory
+  for (size_t i = 0; i < num_entities; i++)
+  {
+    delete[] positions[i];
+  }
+  delete[] positions;
 }
 
 void dotProduct(double *vec1, double *vec2, size_t size, double &result)
@@ -694,16 +684,11 @@ void getLinkForce(std::string applied_by, std::string applied_to, std::string as
 
 void findVector(std::string from_ent, std::string to_ent, Freddy *rob, double *vec)
 {
-  double *from_s = new double[7]{};
-  double *to_s = new double[7]{};
+  double from_s[7]{};
+  double to_s[7]{};
 
   getLinkSFromRob(from_ent, rob, from_s);
-
-  // printf("from_s: %s: %f %f %f\n", from_ent.c_str(), from_s[0], from_s[1], from_s[2]);
-
   getLinkSFromRob(to_ent, rob, to_s);
-
-  // printf("to_s: %s: %f %f %f\n", to_ent.c_str(), to_s[0], to_s[1], to_s[2]);
 
   // TODO: dont use hardcoded values
   // *Assumption* - only linear components
@@ -733,10 +718,8 @@ void findNormalizedVector(const double *vec, double *normalized_vec)
 void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string to_ent,
                      std::string asb_ent, const double signal, double *vec)
 {
-  double *dir_vec = new double[3]{};
+  double dir_vec[3]{};
   findVector(from_ent, to_ent, rob, dir_vec);
-
-  // std::cout << "dir_vec_p: " << dir_vec[0] << " " << dir_vec[1] << " " << dir_vec[2] << std::endl;
 
   // update q values from the robot state
   bool is_in_left_chain, is_in_right_chain = false;
@@ -788,8 +771,6 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
     }
   }
 
-  // std::cout << "dir_vec: " << dir_vec[0] << " " << dir_vec[1] << " " << dir_vec[2] << std::endl;
-
   findNormalizedVector(dir_vec, dir_vec);
 
   for (size_t i = 0; i < 3; i++)
@@ -798,10 +779,24 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
   }
 
   // TODO: update to only for linear components
-  // std::cerr << "[decomposeSignal] should only be for linear, update it" << std::endl;
   for (size_t i = 3; i < 6; i++)
   {
     vec[i] = 0.0;
+  }
+}
+
+void base_communication_thread(Freddy *rob, double *tau_command, std::mutex &data_mutex,
+                               bool &run_thread, std::condition_variable &cv, bool &communicate)
+{
+  while (run_thread)
+  {
+    std::unique_lock<std::mutex> lk(data_mutex);
+    cv.wait(lk, [&] { return communicate || !run_thread; });
+    if (!run_thread) break;
+
+    set_mobile_base_torques(rob, tau_command);
+
+    communicate = false;
   }
 }
 
@@ -831,10 +826,6 @@ void get_robot_data(Freddy *freddy, double dt)
   freddy->mobile_base->state->x_platform[0] = vec.x();
   freddy->mobile_base->state->x_platform[1] = vec.y();
   freddy->mobile_base->state->x_platform[2] = odom[2];
-
-  // std::cout << "odom: " << freddy->mobile_base->state->x_platform[0] << " "
-  //           << freddy->mobile_base->state->x_platform[1] << " "
-  //           << RAD2DEG(freddy->mobile_base->state->x_platform[2]) << std::endl;
 }
 
 void ckpv(Freddy *rob, double dt)
@@ -1141,7 +1132,7 @@ void print_array(double *arr, int size)
   std::cout << "[ ";
   for (size_t i = 0; i < size; i++)
   {
-    std::cout << arr[i] << " ";
+    std::cout << arr[i] << ", ";
   }
   std::cout << "]" << std::endl;
 }

@@ -30,7 +30,7 @@ extern "C"
 #include "motion_spec_utils/solver_utils.hpp"
 
 void rne_solver(Freddy *rob, std::string root_link, std::string tip_link,
-                double *root_acceleration, double **ext_wrench, double *constraint_tau)
+                double *root_acceleration, double ext_wrenches[][6], double *constraint_tau)
 {
   // create a chain from the root_link to the tip_link
   KDL::Chain chain;
@@ -76,7 +76,7 @@ void rne_solver(Freddy *rob, std::string root_link, std::string tip_link,
     KDL::Wrench wrench;
     for (int j = 0; j < 6; j++)
     {
-      wrench(j) = ext_wrench[i][j];
+      wrench(j) = ext_wrenches[i][j];
     }
     f_ext.push_back(wrench);
   }
@@ -161,7 +161,7 @@ void rne_solver_manipulator(Manipulator<kinova_mediator> *rob, double *root_acce
 }
 
 void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
-                      double **ext_wrenches, double *constraint_tau)
+                      double ext_wrenches[][6], double *constraint_tau)
 {
   // create a chain from the root_link to the tip_link
   KDL::Chain *chain = new KDL::Chain();
@@ -238,10 +238,12 @@ void achd_solver_fext(Freddy *rob, std::string root_link, std::string tip_link,
 
   std::chrono::duration<double> elapsed_time = end_time - start_time;
   // std::cout << "[achd fext] Time taken: " << elapsed_time.count() << "s" << std::endl;
+
+  delete chain;
 }
 
 void achd_solver(Freddy *rob, std::string root_link, std::string tip_link, int num_constraints,
-                 double *root_acceleration, double **alpha, double *beta, double *tau_ff,
+                 double *root_acceleration, double alpha[][6], double *beta, double *tau_ff,
                  double *predicted_acc, double *constraint_tau)
 {
   // create a chain from the root_link to the tip_link
@@ -593,12 +595,6 @@ void base_fd_solver(Freddy *rob, double *platform_forces, double *wheel_torques)
 
   // *Assumption* - platform_forces is a 6D vector with forces in x, y, z and torques about x, y, z
   double pf[3] = {platform_forces[0], platform_forces[1], platform_forces[5]};
-  std::cout << "pf: ";
-  for (int i = 0; i < 3; i++)
-  {
-    std::cout << pf[i] << ", ";
-  }
-  std::cout << std::endl;
   set_platform_force(torque_control_state, pf, N);
 
   compute_wheel_torques(rob->mobile_base->mediator->kelo_base_config, torque_control_state,
