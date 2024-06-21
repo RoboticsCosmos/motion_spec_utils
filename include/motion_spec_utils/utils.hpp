@@ -225,7 +225,7 @@ void compute_kelo_platform_pose(double *xd_platform, double dt, double *x_platfo
 
 void computeQuaternionEqualityError(double *measured, double *ref, double *signal);
 
-void print_array(double *arr, int size);
+void print_array(double arr[], int size);
 
 void init_2d_array(double **arr, int rows, int cols);
 

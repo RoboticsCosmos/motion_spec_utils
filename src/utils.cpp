@@ -29,6 +29,7 @@ extern "C"
 }
 
 #include "motion_spec_utils/utils.hpp"
+#include "motion_spec_utils/solver_utils.hpp"
 
 void initialize_manipulator_state(int num_joints, int num_segments, ManipulatorState *rob)
 {
@@ -168,12 +169,39 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
   freddy->kinova_left->mediator->initialize(0, 0, 0.0);
   freddy->kinova_right->mediator->initialize(0, 1, 0.0);
 
+  get_manipulator_data(freddy->kinova_left);
+  update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
+                           &freddy->tree);
+
+  get_manipulator_data(freddy->kinova_right);
+  update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
+                           &freddy->tree);
+
+  // init torques
+  double kr_achd_solver_root_acceleration[6] = {-9.685, -1.033, 1.324, 0.0, 0.0, 0.0};
+  double kl_achd_solver_root_acceleration[6] = {-9.6, 0.99, 1.4, 0.0, 0.0, 0.0};
+
+  double kr_rne_ext_wrench[7][6]{};
+  double kr_rne_output_torques[7]{};
+
+  double kl_rne_ext_wrench[7][6]{};
+  double kl_rne_output_torques[7]{};
+
+  // rne
+  rne_solver(freddy, freddy->kinova_right->base_frame, freddy->kinova_right->tool_frame,
+             kr_achd_solver_root_acceleration, kr_rne_ext_wrench, kr_rne_output_torques);
+
+  rne_solver(freddy, freddy->kinova_left->base_frame, freddy->kinova_left->tool_frame,
+             kl_achd_solver_root_acceleration, kl_rne_ext_wrench, kl_rne_output_torques);
+
+  freddy->kinova_left->mediator->set_control_mode(2, kl_rne_output_torques);
+  freddy->kinova_right->mediator->set_control_mode(2, kr_rne_output_torques);
+
   init_ecx_context(freddy->mobile_base->mediator->ethercat_config);
 
   int result = 0;
-  char ifname[] = "eno1";
   establish_kelo_base_connection(freddy->mobile_base->mediator->kelo_base_config,
-                                 freddy->mobile_base->mediator->ethercat_config, ifname, &result);
+                                 freddy->mobile_base->mediator->ethercat_config, interface, &result);
 
   if (result != 0)
   {
@@ -309,15 +337,15 @@ void update_manipulator_state(ManipulatorState *state, std::string tool_frame, K
 {
   // *Assumption* - computing values in the base_link frame
   // create a chain from the base_link to the tool_link
-  KDL::Chain *chain = new KDL::Chain();
-  if (!tree->getChain("base_link", tool_frame, *chain))
+  KDL::Chain chain;
+  if (!tree->getChain("base_link", tool_frame, chain))
   {
     std::cerr << "Failed to get chain from KDL tree" << std::endl;
   }
 
   // update the s_dot values
-  KDL::ChainFkSolverVel_recursive fk_solver_vel(*chain);
-  std::vector<KDL::FrameVel> frame_vels(chain->getNrOfSegments());
+  KDL::ChainFkSolverVel_recursive fk_solver_vel(chain);
+  std::vector<KDL::FrameVel> frame_vels(chain.getNrOfSegments());
   KDL::JntArrayVel q_dot_kdl(state->nj);
   for (size_t i = 0; i < state->nj; i++)
   {
@@ -326,9 +354,9 @@ void update_manipulator_state(ManipulatorState *state, std::string tool_frame, K
   }
   fk_solver_vel.JntToCart(q_dot_kdl, frame_vels);
 
-  int additional_links = chain->getNrOfSegments() - state->nj;
+  int additional_links = chain.getNrOfSegments() - state->nj;
 
-  for (size_t i = 0; i < chain->getNrOfSegments(); i++)
+  for (size_t i = 0; i < chain.getNrOfSegments(); i++)
   {
     int frame_vel_index = i;  // + additional_links;
 
@@ -351,6 +379,9 @@ void update_manipulator_state(ManipulatorState *state, std::string tool_frame, K
 
 void cap_and_convert_manipulator_torques(double tau_command[], int num_joints, KDL::JntArray &tau_jnt)
 {
+  assert(tau_command);
+  assert(num_joints == tau_jnt.rows());
+
   // limit the torques to +/- 30 Nm
   double max_torque = 30.0;
   for (size_t i = 0; i < num_joints; i++)
@@ -1127,8 +1158,10 @@ void set_init_sim_data(Freddy *freddy)
   freddy->kinova_right->state->q[6] = DEG2RAD(75.74);
 }
 
-void print_array(double *arr, int size)
+void print_array(double arr[], int size)
 {
+  assert(arr);
+  
   std::cout << "[ ";
   for (size_t i = 0; i < size; i++)
   {
