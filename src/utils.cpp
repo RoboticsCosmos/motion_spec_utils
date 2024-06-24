@@ -752,24 +752,23 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
   double dir_vec[3]{};
   findVector(from_ent, to_ent, rob, dir_vec);
 
-  // update q values from the robot state
-  bool is_in_left_chain, is_in_right_chain = false;
-
-  int link_id = -1;
-  findLinkInChain(asb_ent, &rob->kinova_left->chain, is_in_left_chain, link_id);
-  findLinkInChain(asb_ent, &rob->kinova_right->chain, is_in_right_chain, link_id);
-
-  if (!is_in_left_chain && !is_in_right_chain)
-  {
-    std::cerr << "Link not found in the robot chains" << std::endl;
-    return;
-  }
-
-  ManipulatorState *rob_state =
-      is_in_left_chain ? rob->kinova_left->state : rob->kinova_right->state;
 
   if (asb_ent != "base_link")
   {
+    bool is_in_left_chain, is_in_right_chain = false;
+    int link_id = -1;
+    findLinkInChain(asb_ent, &rob->kinova_left->chain, is_in_left_chain, link_id);
+    findLinkInChain(asb_ent, &rob->kinova_right->chain, is_in_right_chain, link_id);
+
+    if (!is_in_left_chain && !is_in_right_chain)
+    {
+      std::cerr << "Link not found in the robot chains" << std::endl;
+      return;
+    }
+
+    ManipulatorState *rob_state =
+        is_in_left_chain ? rob->kinova_left->state : rob->kinova_right->state;
+
     KDL::Chain chain;
     if (!rob->tree.getChain("base_link", asb_ent, chain))
     {
@@ -794,7 +793,7 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
     fk_solver_pos.JntToCart(q, frame);
 
     KDL::Vector vec1(dir_vec[0], dir_vec[1], dir_vec[2]);
-    vec1 = frame.M * vec1;
+    vec1 = frame.M.Inverse() * vec1;
 
     for (size_t i = 0; i < 3; i++)
     {

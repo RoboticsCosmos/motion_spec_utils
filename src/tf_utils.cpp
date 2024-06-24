@@ -34,6 +34,9 @@ extern "C"
 void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, double *wrench,
                       double *transformed_wrench)
 {
+
+  // std::cout << "[TW] from_ent: " << from_ent << " to_ent: " << to_ent << std::endl;
+
   KDL::Chain chain;
   if (!rob->tree.getChain(from_ent, to_ent, chain))
   {
@@ -47,6 +50,8 @@ void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, dou
   {
     forward = false;
   }
+
+  // std::cout << "[TW] forward: " << forward << std::endl;
 
   KDL::Frame frame;
   KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
@@ -96,7 +101,11 @@ void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, dou
     wrench_kdl(i) = wrench[i];
   }
 
-  KDL::Wrench transformed_wrench_kdl = frame.M * wrench_kdl;
+  // std::cout << "[TW] wrench_kdl: " << wrench_kdl << std::endl;
+
+  KDL::Wrench transformed_wrench_kdl = frame.M.Inverse() * wrench_kdl;
+
+  // std::cout << "[TW] transformed_wrench_kdl: " << transformed_wrench_kdl << std::endl;
 
   for (size_t i = 0; i < 6; i++)
   {
@@ -177,156 +186,12 @@ void transform_wrench2(Freddy *rob, std::string from_ent, std::string to_ent, do
   }
 }
 
-void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree, std::string source_frame,
-                     std::string target_frame, double **alpha, int nc, double **transformed_alpha)
-{
-  KDL::Chain chain;
-  if (!tree->getChain(source_frame, target_frame, chain))
-  {
-    std::cerr << "Failed to get chain from KDL tree" << std::endl;
-    return;
-  }
-
-  KDL::Frame frame;
-  KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
-
-  KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
-
-  ManipulatorState *rob_state = rob->state;
-
-  bool forward = true;
-  if (source_frame != "base_link" && target_frame == "base_link")
-  {
-    forward = false;
-  }
-
-  if (chain.getNrOfJoints() != 0)
-  {
-    if (forward)
-    {
-      for (size_t i = 0; i < rob_state->nj; i++)
-      {
-        q(i) = rob_state->q[i];
-      }
-    }
-    else
-    {
-      for (size_t i = 0; i < rob_state->nj; i++)
-      {
-        q(i) = rob_state->q[rob_state->nj - i - 1];
-      }
-    }
-  }
-
-  fk_solver_pos.JntToCart(q, frame);
-
-  KDL::Jacobian alpha_jac(nc);
-  for (size_t i = 0; i < nc; i++)
-  {
-    for (size_t j = 0; j < 6; j++)
-    {
-      alpha_jac(j, i) = alpha[i][j];
-    }
-  }
-
-  for (size_t i = 0; i < nc; i++)
-  {
-    alpha_jac.setColumn(i, frame.M * alpha_jac.getColumn(i));
-  }
-
-  for (size_t i = 0; i < nc; i++)
-  {
-    for (size_t j = 0; j < 6; j++)
-    {
-      transformed_alpha[i][j] = alpha_jac(j, i);
-    }
-  }
-}
-
-void transform_alpha_beta(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
-                          std::string source_frame, std::string target_frame, double **alpha,
-                          double *beta, int nc, double **transformed_alpha,
-                          double *transformed_beta)
-{
-  KDL::Chain chain;
-  if (!tree->getChain(source_frame, target_frame, chain))
-  {
-    std::cerr << "Failed to get chain from KDL tree" << std::endl;
-    return;
-  }
-
-  KDL::Frame frame;
-  KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
-
-  KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
-
-  ManipulatorState *rob_state = rob->state;
-
-  bool forward = true;
-  if (source_frame != "base_link" && target_frame == "base_link")
-  {
-    forward = false;
-  }
-
-  if (chain.getNrOfJoints() != 0)
-  {
-    if (forward)
-    {
-      for (size_t i = 0; i < rob_state->nj; i++)
-      {
-        q(i) = rob_state->q[i];
-      }
-    }
-    else
-    {
-      for (size_t i = 0; i < rob_state->nj; i++)
-      {
-        q(i) = rob_state->q[rob_state->nj - i - 1];
-      }
-    }
-  }
-
-  fk_solver_pos.JntToCart(q, frame);
-
-  KDL::Jacobian alpha_jac(nc);
-  for (size_t i = 0; i < nc; i++)
-  {
-    for (size_t j = 0; j < 6; j++)
-    {
-      alpha_jac(j, i) = alpha[i][j];
-    }
-  }
-
-  for (size_t i = 0; i < nc; i++)
-  {
-    alpha_jac.setColumn(i, frame.M * alpha_jac.getColumn(i));
-  }
-
-  for (size_t i = 0; i < nc; i++)
-  {
-    for (size_t j = 0; j < 6; j++)
-    {
-      transformed_alpha[i][j] = alpha_jac(j, i);
-    }
-  }
-
-  KDL::Twist beta_acc_twist;
-  for (size_t i = 0; i < 6; i++)
-  {
-    beta_acc_twist(i) = beta[i];
-  }
-
-  KDL::Twist transformed_beta_acc_twist = frame.M * beta_acc_twist;
-
-  for (size_t i = 0; i < 6; i++)
-  {
-    transformed_beta[i] = transformed_beta_acc_twist(i);
-  }
-}
-
 void transform_alpha(Freddy *rob, std::string source_frame, std::string target_frame,
                      double alpha[][6], int nc, double transformed_alpha[][6])
 {
+  // std::cout << "[TA] source_frame: " << source_frame << " target_frame: " << target_frame
+  //           << std::endl;
+
   KDL::Chain chain;
   if (!rob->tree.getChain(source_frame, target_frame, chain))
   {
@@ -391,10 +256,14 @@ void transform_alpha(Freddy *rob, std::string source_frame, std::string target_f
     }
   }
 
+  // std::cout << "[TA] alpha_jac: \n" << alpha_jac << std::endl;
+
   for (size_t i = 0; i < nc; i++)
   {
-    alpha_jac.setColumn(i, frame.M * alpha_jac.getColumn(i));
+    alpha_jac.setColumn(i, frame.M.Inverse() * alpha_jac.getColumn(i));
   }
+
+  // std::cout << "[TA] alpha_jac_t: \n" << alpha_jac << std::endl;
 
   for (size_t i = 0; i < nc; i++)
   {
@@ -693,5 +562,152 @@ void findLinkInChain(std::string link_name, KDL::Chain *chain, bool &is_in_chain
       link_id = i;
       return;
     }
+  }
+}
+
+void transform_alpha(Manipulator<kinova_mediator> *rob, KDL::Tree *tree, std::string source_frame,
+                     std::string target_frame, double **alpha, int nc, double **transformed_alpha)
+{
+  KDL::Chain chain;
+  if (!tree->getChain(source_frame, target_frame, chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+    return;
+  }
+
+  KDL::Frame frame;
+  KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
+
+  KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
+
+  ManipulatorState *rob_state = rob->state;
+
+  bool forward = true;
+  if (source_frame != "base_link" && target_frame == "base_link")
+  {
+    forward = false;
+  }
+
+  if (chain.getNrOfJoints() != 0)
+  {
+    if (forward)
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[i];
+      }
+    }
+    else
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[rob_state->nj - i - 1];
+      }
+    }
+  }
+
+  fk_solver_pos.JntToCart(q, frame);
+
+  KDL::Jacobian alpha_jac(nc);
+  for (size_t i = 0; i < nc; i++)
+  {
+    for (size_t j = 0; j < 6; j++)
+    {
+      alpha_jac(j, i) = alpha[i][j];
+    }
+  }
+
+  for (size_t i = 0; i < nc; i++)
+  {
+    alpha_jac.setColumn(i, frame.M * alpha_jac.getColumn(i));
+  }
+
+  for (size_t i = 0; i < nc; i++)
+  {
+    for (size_t j = 0; j < 6; j++)
+    {
+      transformed_alpha[i][j] = alpha_jac(j, i);
+    }
+  }
+}
+
+void transform_alpha_beta(Manipulator<kinova_mediator> *rob, KDL::Tree *tree,
+                          std::string source_frame, std::string target_frame, double **alpha,
+                          double *beta, int nc, double **transformed_alpha,
+                          double *transformed_beta)
+{
+  KDL::Chain chain;
+  if (!tree->getChain(source_frame, target_frame, chain))
+  {
+    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+    return;
+  }
+
+  KDL::Frame frame;
+  KDL::ChainFkSolverPos_recursive fk_solver_pos(chain);
+
+  KDL::JntArray q = KDL::JntArray(chain.getNrOfJoints());
+
+  ManipulatorState *rob_state = rob->state;
+
+  bool forward = true;
+  if (source_frame != "base_link" && target_frame == "base_link")
+  {
+    forward = false;
+  }
+
+  if (chain.getNrOfJoints() != 0)
+  {
+    if (forward)
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[i];
+      }
+    }
+    else
+    {
+      for (size_t i = 0; i < rob_state->nj; i++)
+      {
+        q(i) = rob_state->q[rob_state->nj - i - 1];
+      }
+    }
+  }
+
+  fk_solver_pos.JntToCart(q, frame);
+
+  KDL::Jacobian alpha_jac(nc);
+  for (size_t i = 0; i < nc; i++)
+  {
+    for (size_t j = 0; j < 6; j++)
+    {
+      alpha_jac(j, i) = alpha[i][j];
+    }
+  }
+
+  for (size_t i = 0; i < nc; i++)
+  {
+    alpha_jac.setColumn(i, frame.M * alpha_jac.getColumn(i));
+  }
+
+  for (size_t i = 0; i < nc; i++)
+  {
+    for (size_t j = 0; j < 6; j++)
+    {
+      transformed_alpha[i][j] = alpha_jac(j, i);
+    }
+  }
+
+  KDL::Twist beta_acc_twist;
+  for (size_t i = 0; i < 6; i++)
+  {
+    beta_acc_twist(i) = beta[i];
+  }
+
+  KDL::Twist transformed_beta_acc_twist = frame.M * beta_acc_twist;
+
+  for (size_t i = 0; i < 6; i++)
+  {
+    transformed_beta[i] = transformed_beta_acc_twist(i);
   }
 }
