@@ -122,9 +122,20 @@ void free_mobile_base(MobileBase<Robile> *base)
 
 void free_robot_data(Freddy *rob)
 {
-  free_manipulator(rob->kinova_left);
-  free_manipulator(rob->kinova_right);
-  free_mobile_base(rob->mobile_base);
+  if (rob->kinova_left != nullptr)
+  {
+    free_manipulator(rob->kinova_left);
+  }
+
+  if (rob->kinova_right != nullptr)
+  {
+    free_manipulator(rob->kinova_right);
+  }
+
+  if (rob->mobile_base != nullptr)
+  {
+    free_mobile_base(rob->mobile_base);
+  }
 }
 
 void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
@@ -139,74 +150,91 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
   // *Assumption* - base_link is the root link
   std::string base_link = "base_link";
 
-  // left arm
-  if (!freddy->tree.getChain(base_link, freddy->kinova_left->tool_frame,
-                             freddy->kinova_left->chain))
+  if (freddy->kinova_left != nullptr)
   {
-    std::cerr << "Failed to get chain from KDL tree" << std::endl;
-    exit(1);
+    // left arm
+    if (!freddy->tree.getChain(base_link, freddy->kinova_left->tool_frame,
+                               freddy->kinova_left->chain))
+    {
+      std::cerr << "Failed to get chain from KDL tree" << std::endl;
+      exit(1);
+    }
+
+    initialize_manipulator_state(freddy->kinova_left->chain.getNrOfJoints(),
+                                 freddy->kinova_left->chain.getNrOfSegments(),
+                                 freddy->kinova_left->state);
+
+    freddy->kinova_left->mediator->initialize(0, 0, 0.0);
+
+    get_manipulator_data(freddy->kinova_left);
+    update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
+                             &freddy->tree);
   }
 
-  // right arm
-  if (!freddy->tree.getChain(base_link, freddy->kinova_right->tool_frame,
-                             freddy->kinova_right->chain))
+  if (freddy->kinova_right != nullptr)
   {
-    std::cerr << "Failed to get chain from KDL tree" << std::endl;
+    // right arm
+    if (!freddy->tree.getChain(base_link, freddy->kinova_right->tool_frame,
+                               freddy->kinova_right->chain))
+    {
+      std::cerr << "Failed to get chain from KDL tree" << std::endl;
+      exit(1);
+    }
+
+    initialize_manipulator_state(freddy->kinova_right->chain.getNrOfJoints(),
+                                 freddy->kinova_right->chain.getNrOfSegments(),
+                                 freddy->kinova_right->state);
+
+    freddy->kinova_right->mediator->initialize(0, 1, 0.0);
+
+    get_manipulator_data(freddy->kinova_right);
+    update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
+                             &freddy->tree);
   }
 
-  // initialize the states
-  initialize_manipulator_state(freddy->kinova_left->chain.getNrOfJoints(),
-                               freddy->kinova_left->chain.getNrOfSegments(),
-                               freddy->kinova_left->state);
-
-  initialize_manipulator_state(freddy->kinova_right->chain.getNrOfJoints(),
-                               freddy->kinova_right->chain.getNrOfSegments(),
-                               freddy->kinova_right->state);
-
-  initialize_mobile_base_state(freddy->mobile_base->state);
-
-  // initialize the mediators
-  freddy->kinova_left->mediator->initialize(0, 0, 0.0);
-  freddy->kinova_right->mediator->initialize(0, 1, 0.0);
-
-  get_manipulator_data(freddy->kinova_left);
-  update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
-                           &freddy->tree);
-
-  get_manipulator_data(freddy->kinova_right);
-  update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
-                           &freddy->tree);
-
-  // init torques
-  double kr_achd_solver_root_acceleration[6] = {-9.685, -1.033, 1.324, 0.0, 0.0, 0.0};
-  double kl_achd_solver_root_acceleration[6] = {-9.6, 0.99, 1.4, 0.0, 0.0, 0.0};
-
-  double kr_rne_ext_wrench[7][6]{};
-  double kr_rne_output_torques[7]{};
-
-  double kl_rne_ext_wrench[7][6]{};
-  double kl_rne_output_torques[7]{};
-
-  // rne
-  rne_solver(freddy, freddy->kinova_right->base_frame, freddy->kinova_right->tool_frame,
-             kr_achd_solver_root_acceleration, kr_rne_ext_wrench, kr_rne_output_torques);
-
-  rne_solver(freddy, freddy->kinova_left->base_frame, freddy->kinova_left->tool_frame,
-             kl_achd_solver_root_acceleration, kl_rne_ext_wrench, kl_rne_output_torques);
-
-  freddy->kinova_left->mediator->set_control_mode(2, kl_rne_output_torques);
-  freddy->kinova_right->mediator->set_control_mode(2, kr_rne_output_torques);
-
-  init_ecx_context(freddy->mobile_base->mediator->ethercat_config);
-
-  int result = 0;
-  establish_kelo_base_connection(freddy->mobile_base->mediator->kelo_base_config,
-                                 freddy->mobile_base->mediator->ethercat_config, interface, &result);
-
-  if (result != 0)
+  if (freddy->mobile_base != nullptr)
   {
-    std::cerr << "Failed to establish connection with the mobile base" << std::endl;
-    exit(1);
+    initialize_mobile_base_state(freddy->mobile_base->state);
+  }
+
+  if (freddy->kinova_left != nullptr)
+  {
+    double kl_achd_solver_root_acceleration[6] = {-9.6, 0.99, 1.4, 0.0, 0.0, 0.0};
+    double kl_rne_ext_wrench[7][6]{};
+    double kl_rne_output_torques[7]{};
+    rne_solver(freddy, freddy->kinova_left->base_frame, freddy->kinova_left->tool_frame,
+               kl_achd_solver_root_acceleration, kl_rne_ext_wrench, kl_rne_output_torques);
+
+    freddy->kinova_left->mediator->set_control_mode(2, kl_rne_output_torques);
+  }
+
+  if (freddy->kinova_right != nullptr)
+  {
+    freddy->kinova_right->mediator->set_control_mode(0, freddy->kinova_right->state->tau_command);
+    double kr_achd_solver_root_acceleration[6] = {-9.685, -1.033, 1.324, 0.0, 0.0, 0.0};
+    double kr_rne_ext_wrench[7][6]{};
+    double kr_rne_output_torques[7]{};
+    rne_solver(freddy, freddy->kinova_right->base_frame, freddy->kinova_right->tool_frame,
+               kr_achd_solver_root_acceleration, kr_rne_ext_wrench, kr_rne_output_torques);
+    freddy->kinova_right->mediator->set_control_mode(2, kr_rne_output_torques);
+  }
+
+  if (freddy->mobile_base != nullptr)
+  {
+    init_ecx_context(freddy->mobile_base->mediator->ethercat_config);
+    int result = 0;
+    establish_kelo_base_connection(freddy->mobile_base->mediator->kelo_base_config,
+                                   freddy->mobile_base->mediator->ethercat_config, interface,
+                                   &result);
+
+    if (result != 0)
+    {
+      std::cerr << "Failed to establish connection with the mobile base" << std::endl;
+      exit(1);
+    }
+
+    update_base_state(freddy->mobile_base->mediator->kelo_base_config,
+                      freddy->mobile_base->mediator->ethercat_config);
   }
 
   std::cout << "Successfully initialized robot" << std::endl;
@@ -377,7 +405,8 @@ void update_manipulator_state(ManipulatorState *state, std::string tool_frame, K
   }
 }
 
-void cap_and_convert_manipulator_torques(double tau_command[], int num_joints, KDL::JntArray &tau_jnt)
+void cap_and_convert_manipulator_torques(double tau_command[], int num_joints,
+                                         KDL::JntArray &tau_jnt)
 {
   assert(tau_command);
   assert(num_joints == tau_jnt.rows());
@@ -752,7 +781,6 @@ void decomposeSignal(Freddy *rob, const std::string from_ent, const std::string 
   double dir_vec[3]{};
   findVector(from_ent, to_ent, rob, dir_vec);
 
-
   if (asb_ent != "base_link")
   {
     bool is_in_left_chain, is_in_right_chain = false;
@@ -822,7 +850,8 @@ void base_communication_thread(Freddy *rob, double *tau_command, std::mutex &dat
   {
     std::unique_lock<std::mutex> lk(data_mutex);
     cv.wait(lk, [&] { return communicate || !run_thread; });
-    if (!run_thread) break;
+    if (!run_thread)
+      break;
 
     set_mobile_base_torques(rob, tau_command);
 
@@ -832,30 +861,41 @@ void base_communication_thread(Freddy *rob, double *tau_command, std::mutex &dat
 
 void get_robot_data(Freddy *freddy, double dt)
 {
-  get_manipulator_data(freddy->kinova_left);
-  update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
-                           &freddy->tree);
+  if (freddy->kinova_left != nullptr)
+  {
+    get_manipulator_data(freddy->kinova_left);
+    update_manipulator_state(freddy->kinova_left->state, freddy->kinova_left->tool_frame,
+                             &freddy->tree);
+  }
 
-  get_manipulator_data(freddy->kinova_right);
-  update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
-                           &freddy->tree);
+  if (freddy->kinova_right != nullptr)
+  {
+    get_manipulator_data(freddy->kinova_right);
+    update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
+                            &freddy->tree);
+  }
 
-  get_kelo_base_state(
-      freddy->mobile_base->mediator->kelo_base_config,
-      freddy->mobile_base->mediator->ethercat_config, freddy->mobile_base->state->pivot_angles,
-      freddy->mobile_base->state->wheel_encoder_values, freddy->mobile_base->state->qd_wheel);
+  if (freddy->mobile_base != nullptr)
+  {
+    printf("Getting mobile base data\n");
+    get_kelo_base_state(
+        freddy->mobile_base->mediator->kelo_base_config,
+        freddy->mobile_base->mediator->ethercat_config, freddy->mobile_base->state->pivot_angles,
+        freddy->mobile_base->state->wheel_encoder_values, freddy->mobile_base->state->qd_wheel);
 
-  compute_kelo_platform_velocity(freddy);
-  double odom[3]{};
-  compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, 0.011, odom);
+    compute_kelo_platform_velocity(freddy);
+    double odom[3]{};
+    // 0.011
+    compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, dt, odom);
 
-  // compensate for the offset from velocity computation
-  KDL::Rotation rot = KDL::Rotation::RotZ(DEG2RAD(-90));
-  KDL::Vector vec(odom[0], odom[1], 0.0);
-  vec = rot * vec;
-  freddy->mobile_base->state->x_platform[0] = vec.x();
-  freddy->mobile_base->state->x_platform[1] = vec.y();
-  freddy->mobile_base->state->x_platform[2] = odom[2];
+    // compensate for the offset from velocity computation
+    KDL::Rotation rot = KDL::Rotation::RotZ(DEG2RAD(-90));
+    KDL::Vector vec(odom[0], odom[1], 0.0);
+    vec = rot * vec;
+    freddy->mobile_base->state->x_platform[0] = vec.x();
+    freddy->mobile_base->state->x_platform[1] = vec.y();
+    freddy->mobile_base->state->x_platform[2] = odom[2];
+  }
 }
 
 void ckpv(Freddy *rob, double dt)
@@ -1160,7 +1200,7 @@ void set_init_sim_data(Freddy *freddy)
 void print_array(double arr[], int size)
 {
   assert(arr);
-  
+
   std::cout << "[ ";
   for (size_t i = 0; i < size; i++)
   {
