@@ -87,6 +87,7 @@ target_link_libraries(mutils
   kelo_motion_control
   kelo_kindyn
   tf_utils
+  solver_utils
 )
 
 # install
