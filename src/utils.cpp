@@ -872,29 +872,38 @@ void get_robot_data(Freddy *freddy, double dt)
   {
     get_manipulator_data(freddy->kinova_right);
     update_manipulator_state(freddy->kinova_right->state, freddy->kinova_right->tool_frame,
-                            &freddy->tree);
+                             &freddy->tree);
   }
 
   if (freddy->mobile_base != nullptr)
   {
-    printf("Getting mobile base data\n");
+    // printf("Getting mobile base data\n");
     get_kelo_base_state(
         freddy->mobile_base->mediator->kelo_base_config,
         freddy->mobile_base->mediator->ethercat_config, freddy->mobile_base->state->pivot_angles,
         freddy->mobile_base->state->wheel_encoder_values, freddy->mobile_base->state->qd_wheel);
 
     compute_kelo_platform_velocity(freddy);
-    double odom[3]{};
-    // 0.011
-    compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, dt, odom);
 
-    // compensate for the offset from velocity computation
-    KDL::Rotation rot = KDL::Rotation::RotZ(DEG2RAD(-90));
-    KDL::Vector vec(odom[0], odom[1], 0.0);
-    vec = rot * vec;
-    freddy->mobile_base->state->x_platform[0] = vec.x();
-    freddy->mobile_base->state->x_platform[1] = vec.y();
-    freddy->mobile_base->state->x_platform[2] = odom[2];
+    KDL::Vector vel_vec = KDL::Vector(freddy->mobile_base->state->xd_platform[0],
+                                      freddy->mobile_base->state->xd_platform[1],
+                                      freddy->mobile_base->state->xd_platform[2]);
+
+    KDL::Rotation rot = KDL::Rotation::RotZ(DEG2RAD(90));
+
+    vel_vec = rot * vel_vec;
+
+    freddy->mobile_base->state->xd_platform[0] = vel_vec.x();
+    freddy->mobile_base->state->xd_platform[1] = vel_vec.y();
+    freddy->mobile_base->state->xd_platform[2] = vel_vec.z();
+
+    // 0.011
+    compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, 0.05 / 6.56,
+                               freddy->mobile_base->state->x_platform);
+
+    // std::cout << "Platform pose: " << freddy->mobile_base->state->x_platform[0] << " "
+    //           << freddy->mobile_base->state->x_platform[1] << " "
+    //           << freddy->mobile_base->state->x_platform[2] << std::endl;
   }
 }
 
@@ -1003,7 +1012,7 @@ void compute_kelo_platform_velocity(Freddy *rob)
 
 void compute_kelo_platform_pose(double *xd_platform, double dt, double *x_platform)
 {
-  double dx, dy = 0.0;
+  double dx, dy;
 
   if (fabs(xd_platform[2] > 0.001))
   {
