@@ -49,6 +49,13 @@
 #include "kdl_parser/kdl_parser.hpp"
 #include "motion_spec_utils/robot_structs.hpp"
 
+#include <kelo_kindyn/functions/kelo_platform.h>
+#include <kelo_kindyn/functions/kelo_platform_solver.h>
+#include <kelo_kindyn/functions/kelo_drive.h>
+#include <kelo_kindyn/functions/kelo_wheel.h>
+
+#include <unsupported/Eigen/MatrixFunctions>
+
 
 /**
  * @brief Solves the hybrid dynamics problem for a given robot chain.
@@ -85,5 +92,11 @@ void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constrai
 void rne_solver_manipulator(Manipulator<kinova_mediator> *rob, double *root_acceleration,
                             double **ext_wrench, double *constraint_tau);
 
+void get_pivot_alignment_offsets(Freddy *robot, double *platform_force, double *lin_offsets,
+                                 double *ang_offsets);
+
+void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double *linear_offsets,
+                                   double *angular_offsets, double *platform_weights,
+                                   double *wheel_torques);
 
 #endif  // SOLVER_UTILS_HPP

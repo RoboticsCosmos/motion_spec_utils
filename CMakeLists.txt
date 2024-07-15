@@ -60,6 +60,7 @@ target_link_libraries(solver_utils
   kdl_parser
   orocos-kdl
   kelo_motion_control
+  kelo_kindyn
 )
 
 add_library(tf_utils SHARED src/tf_utils.cpp)

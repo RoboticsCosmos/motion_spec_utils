@@ -1249,3 +1249,4 @@ void write_odom_data_to_open_file(FILE *file, std::vector<std::array<double, 3>>
     fprintf(file, "%f,%f,%f\n", odom_data[i][0], odom_data[i][1], odom_data[i][2]);
   }
 }
+

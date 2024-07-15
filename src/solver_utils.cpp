@@ -517,7 +517,6 @@ void achd_solver_manipulator(Manipulator<kinova_mediator> *rob, int num_constrai
   }
 }
 
-
 void wrench_estimator(Freddy *rob, std::string root_link, std::string tip_link,
                       double *root_acceleration, double *tau, double *tool_wrench)
 {
@@ -602,4 +601,114 @@ void base_fd_solver(Freddy *rob, double *platform_forces, double *wheel_torques)
 
   free_torque_control_state(torque_control_state);
   delete torque_control_state;
+}
+
+void get_pivot_alignment_offsets(Freddy *robot, double *platform_force, double *lin_offsets,
+                                 double *ang_offsets)
+{
+  Eigen::Rotation2Dd rot_ccw(M_PI / 2);
+  Eigen::Rotation2Dd rot_cw(-M_PI / 2);
+
+  Eigen::Vector2d lin_platform_force;
+  lin_platform_force << platform_force[0], platform_force[1];
+  lin_platform_force.normalize();
+
+  // compute the direction vectors of the pivot links
+  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels; i++)
+  {
+    double pd_x = cos(robot->mobile_base->state->pivot_angles[i]);
+    double pd_y = sin(robot->mobile_base->state->pivot_angles[i]);
+
+    Eigen::Vector2d pivot_dir;
+    pivot_dir << pd_x, pd_y;
+
+    Eigen::Vector2d attachment;
+    attachment << robot->mobile_base->mediator->kelo_base_config->wheel_coordinates[2 * i],
+        robot->mobile_base->mediator->kelo_base_config->wheel_coordinates[2 * i + 1];
+
+    // compute tangent vector of the attachment vector in cw or ccw based on platform force[2] -
+    // moment if the moment is positive, the tangents are in ccw, otherwise in cw
+    Eigen::Vector2d tangent = platform_force[2] > 0 ? rot_ccw * attachment : rot_cw * attachment;
+
+    // get the angular offsets between the pivot direction and the tangent
+    ang_offsets[i] = atan2(pivot_dir.x() * tangent.y() - pivot_dir.y() * tangent.x(),
+                           pivot_dir.x() * tangent.x() + pivot_dir.y() * tangent.y());
+
+    // get the angular offsets between the pivot direction and platform linear force
+    lin_offsets[i] =
+        atan2(pivot_dir.x() * lin_platform_force.y() - pivot_dir.y() * lin_platform_force.x(),
+              pivot_dir.x() * lin_platform_force.x() + pivot_dir.y() * lin_platform_force.y());
+  }
+}
+
+void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double *linear_offsets,
+                                   double *angular_offsets, double *platform_weights,
+                                   double *wheel_torques)
+{
+  assert(platform_force);
+  assert(platform_weights);
+  assert(wheel_torques);
+
+  // transform the platform force by 90 degrees ccw
+  Eigen::Rotation2Dd pf_correction_rot(M_PI / 2);
+  Eigen::Vector2d lin_pf = Eigen::Vector2d(platform_force[0], platform_force[1]);
+  lin_pf = pf_correction_rot * lin_pf;
+
+  platform_force[0] = lin_pf.x();
+  platform_force[1] = lin_pf.y();
+
+  double lin_force_weight = lin_pf.norm() == 0.0 ? 0.0 : platform_weights[0];
+  double moment_weight = platform_force[2] == 0.0 ? 0.0 : platform_weights[1];
+
+  double alignment_taus[robot->mobile_base->mediator->kelo_base_config->nWheels];
+  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels; i++)
+  {
+    alignment_taus[i] = linear_offsets[i] * lin_force_weight + angular_offsets[i] * moment_weight;
+  }
+
+  double tau_wheel_ref[robot->mobile_base->mediator->kelo_base_config->nWheels * 2];
+  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels; i++)
+  {
+    tau_wheel_ref[2 * i] = alignment_taus[i];
+    tau_wheel_ref[2 * i + 1] = -alignment_taus[i];
+  }
+
+  // solver
+  // initialize variables
+  double caster_offsets[robot->mobile_base->mediator->kelo_base_config->nWheels]{};
+  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels; i++)
+  {
+    caster_offsets[i] = robot->mobile_base->mediator->kelo_base_config->castor_offset;
+  }
+
+  double wheel_distances[robot->mobile_base->mediator->kelo_base_config->nWheels]{};
+  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels; i++)
+  {
+    wheel_distances[i] = robot->mobile_base->mediator->kelo_base_config->half_wheel_distance * 2;
+  }
+
+  double wheel_diameters[8]{};
+  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels * 2; i++)
+  {
+    wheel_diameters[i] = robot->mobile_base->mediator->kelo_base_config->radius * 2;
+  }
+
+  double w_drive[robot->mobile_base->mediator->kelo_base_config->nWheels *
+                 robot->mobile_base->mediator->kelo_base_config->nWheels] = {
+      // [1/N^2]
+      1.0, 0.0, 0.0, 1.0,  // fl-xx, fl-xy, fl-yx, fl-yy
+      1.0, 0.0, 0.0, 1.0,  // rl-xx, rl-xy, rl-yx, rl-yy
+      1.0, 0.0, 0.0, 1.0,  // rr-xx, rr-xy, rr-yx, rr-yy
+      1.0, 0.0, 0.0, 1.0   // fr-xx, fr-xy, fr-yx, fr-yy
+  };
+
+  double force_dist_mat_whl[3 * 2 * robot->mobile_base->mediator->kelo_base_config->nWheels];
+  kelo_pltf_frc_comp_mat_whl(robot->mobile_base->mediator->kelo_base_config->nWheels,
+                             robot->mobile_base->mediator->kelo_base_config->wheel_coordinates,
+                             caster_offsets, wheel_distances, wheel_diameters,
+                             robot->mobile_base->state->pivot_angles, force_dist_mat_whl);
+
+  kelo_pltf_slv_inv_frc_dist_cgls(robot->mobile_base->mediator->kelo_base_config->nWheels,
+                                  force_dist_mat_whl, w_drive, platform_force, tau_wheel_ref,
+                                  wheel_torques);
 }
