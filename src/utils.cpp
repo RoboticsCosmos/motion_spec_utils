@@ -197,27 +197,27 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
     initialize_mobile_base_state(freddy->mobile_base->state);
   }
 
-  if (freddy->kinova_left != nullptr)
-  {
-    double kl_achd_solver_root_acceleration[6] = {-9.6, 0.99, 1.4, 0.0, 0.0, 0.0};
-    double kl_rne_ext_wrench[7][6]{};
-    double kl_rne_output_torques[7]{};
-    rne_solver(freddy, freddy->kinova_left->base_frame, freddy->kinova_left->tool_frame,
-               kl_achd_solver_root_acceleration, kl_rne_ext_wrench, kl_rne_output_torques);
+  // if (freddy->kinova_left != nullptr)
+  // {
+  //   double kl_achd_solver_root_acceleration[6] = {-9.6, 0.99, 1.4, 0.0, 0.0, 0.0};
+  //   double kl_rne_ext_wrench[7][6]{};
+  //   double kl_rne_output_torques[7]{};
+  //   rne_solver(freddy, freddy->kinova_left->base_frame, freddy->kinova_left->tool_frame,
+  //              kl_achd_solver_root_acceleration, kl_rne_ext_wrench, kl_rne_output_torques);
 
-    freddy->kinova_left->mediator->set_control_mode(2, kl_rne_output_torques);
-  }
+  //   freddy->kinova_left->mediator->set_control_mode(2, kl_rne_output_torques);
+  // }
 
-  if (freddy->kinova_right != nullptr)
-  {
-    freddy->kinova_right->mediator->set_control_mode(0, freddy->kinova_right->state->tau_command);
-    double kr_achd_solver_root_acceleration[6] = {-9.685, -1.033, 1.324, 0.0, 0.0, 0.0};
-    double kr_rne_ext_wrench[7][6]{};
-    double kr_rne_output_torques[7]{};
-    rne_solver(freddy, freddy->kinova_right->base_frame, freddy->kinova_right->tool_frame,
-               kr_achd_solver_root_acceleration, kr_rne_ext_wrench, kr_rne_output_torques);
-    freddy->kinova_right->mediator->set_control_mode(2, kr_rne_output_torques);
-  }
+  // if (freddy->kinova_right != nullptr)
+  // {
+  //   // freddy->kinova_right->mediator->set_control_mode(0, freddy->kinova_right->state->tau_command);
+  //   double kr_achd_solver_root_acceleration[6] = {-9.685, -1.033, 1.324, 0.0, 0.0, 0.0};
+  //   double kr_rne_ext_wrench[7][6]{};
+  //   double kr_rne_output_torques[7]{};
+  //   rne_solver(freddy, freddy->kinova_right->base_frame, freddy->kinova_right->tool_frame,
+  //              kr_achd_solver_root_acceleration, kr_rne_ext_wrench, kr_rne_output_torques);
+  //   freddy->kinova_right->mediator->set_control_mode(2, kr_rne_output_torques);
+  // }
 
   if (freddy->mobile_base != nullptr)
   {
@@ -562,7 +562,7 @@ void getLine(Freddy *rob, std::string *entities, size_t num_entities, double *di
   }
 
   // normalize the direction vector
-  findNormalizedVector(direction, direction);
+  // findNormalizedVector(direction, direction);
 
   // free memory
   for (size_t i = 0; i < num_entities; i++)
@@ -612,13 +612,16 @@ void getAngleBetweenLines(Freddy *rob, double *line1, double *line2, double *ang
     angle_about_vec_angular[i - 3] = angle_about_vec[i];
   }
 
-  double dot_product = 0.0;
-  dotProduct(line1, angle_about_vec_angular, 3, dot_product);
+  double dot_product_1 = 0.0;
+  dotProduct(line1, angle_about_vec_angular, 3, dot_product_1);
+
+  double dot_product_2 = 0.0;
+  dotProduct(line2, angle_about_vec_angular, 3, dot_product_2);
 
   for (size_t i = 0; i < 3; i++)
   {
-    proj_line1[i] = line1[i] - dot_product * angle_about_vec_angular[i];
-    proj_line2[i] = line2[i] - dot_product * angle_about_vec_angular[i];
+    proj_line1[i] = line1[i] - dot_product_1 * angle_about_vec_angular[i];
+    proj_line2[i] = line2[i] - dot_product_2 * angle_about_vec_angular[i];
   }
 
   // find the angle between the projected lines
@@ -632,6 +635,15 @@ void getAngleBetweenLines(Freddy *rob, double *line1, double *line2, double *ang
   getMagnitude(cross_product, 3, cross_product_magnitude);
 
   angle = atan2(cross_product_magnitude, dot_product_proj);
+
+  // determine the sign of the angle
+  double dot_product_with_angle_about_vec = 0.0;
+  dotProduct(cross_product, angle_about_vec_angular, 3, dot_product_with_angle_about_vec);
+
+  if (dot_product_with_angle_about_vec < 0)
+  {
+    angle = -angle;
+  }
 
   // free memory
   delete[] proj_line1;
@@ -885,25 +897,25 @@ void get_robot_data(Freddy *freddy, double dt)
 
     compute_kelo_platform_velocity(freddy);
 
-    KDL::Vector vel_vec = KDL::Vector(freddy->mobile_base->state->xd_platform[0],
-                                      freddy->mobile_base->state->xd_platform[1],
-                                      freddy->mobile_base->state->xd_platform[2]);
+    // KDL::Vector vel_vec = KDL::Vector(freddy->mobile_base->state->xd_platform[0],
+    //                                   freddy->mobile_base->state->xd_platform[1],
+    //                                   freddy->mobile_base->state->xd_platform[2]);
 
-    KDL::Rotation rot = KDL::Rotation::RotZ(DEG2RAD(90));
+    // KDL::Rotation rot = KDL::Rotation::RotZ(DEG2RAD(-90));
 
-    vel_vec = rot * vel_vec;
+    // vel_vec = rot * vel_vec;
 
-    freddy->mobile_base->state->xd_platform[0] = vel_vec.x();
-    freddy->mobile_base->state->xd_platform[1] = vel_vec.y();
-    freddy->mobile_base->state->xd_platform[2] = vel_vec.z();
+    // freddy->mobile_base->state->xd_platform[0] = vel_vec.x();
+    // freddy->mobile_base->state->xd_platform[1] = vel_vec.y();
+    // freddy->mobile_base->state->xd_platform[2] = vel_vec.z();
 
     // 0.011
-    compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, 0.05 / 6.56,
+    compute_kelo_platform_pose(freddy->mobile_base->state->xd_platform, dt,
                                freddy->mobile_base->state->x_platform);
 
     // std::cout << "Platform pose: " << freddy->mobile_base->state->x_platform[0] << " "
     //           << freddy->mobile_base->state->x_platform[1] << " "
-    //           << freddy->mobile_base->state->x_platform[2] << std::endl;
+    //           << RAD2DEG(freddy->mobile_base->state->x_platform[2]) << std::endl;
   }
 }
 

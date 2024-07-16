@@ -178,7 +178,7 @@ void transform_wrench2(Freddy *rob, std::string from_ent, std::string to_ent, do
     wrench_kdl(i) = wrench[i];
   }
 
-  KDL::Wrench transformed_wrench_kdl = frame * wrench_kdl;
+  KDL::Wrench transformed_wrench_kdl = frame.Inverse() * wrench_kdl;
 
   for (size_t i = 0; i < 6; i++)
   {
