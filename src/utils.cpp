@@ -197,27 +197,27 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
     initialize_mobile_base_state(freddy->mobile_base->state);
   }
 
-  // if (freddy->kinova_left != nullptr)
-  // {
-  //   double kl_achd_solver_root_acceleration[6] = {-9.6, 0.99, 1.4, 0.0, 0.0, 0.0};
-  //   double kl_rne_ext_wrench[7][6]{};
-  //   double kl_rne_output_torques[7]{};
-  //   rne_solver(freddy, freddy->kinova_left->base_frame, freddy->kinova_left->tool_frame,
-  //              kl_achd_solver_root_acceleration, kl_rne_ext_wrench, kl_rne_output_torques);
+  if (freddy->kinova_left != nullptr)
+  {
+    double kl_achd_solver_root_acceleration[6] = {-9.6, 0.98, 1.42, 0.0, 0.0, 0.0};
+    double kl_rne_ext_wrench[7][6]{};
+    double kl_rne_output_torques[7]{};
+    rne_solver(freddy, freddy->kinova_left->base_frame, freddy->kinova_left->tool_frame,
+               kl_achd_solver_root_acceleration, kl_rne_ext_wrench, kl_rne_output_torques);
 
-  //   freddy->kinova_left->mediator->set_control_mode(2, kl_rne_output_torques);
-  // }
+    freddy->kinova_left->mediator->set_control_mode(2, kl_rne_output_torques);
+  }
 
-  // if (freddy->kinova_right != nullptr)
-  // {
-  //   // freddy->kinova_right->mediator->set_control_mode(0, freddy->kinova_right->state->tau_command);
-  //   double kr_achd_solver_root_acceleration[6] = {-9.685, -1.033, 1.324, 0.0, 0.0, 0.0};
-  //   double kr_rne_ext_wrench[7][6]{};
-  //   double kr_rne_output_torques[7]{};
-  //   rne_solver(freddy, freddy->kinova_right->base_frame, freddy->kinova_right->tool_frame,
-  //              kr_achd_solver_root_acceleration, kr_rne_ext_wrench, kr_rne_output_torques);
-  //   freddy->kinova_right->mediator->set_control_mode(2, kr_rne_output_torques);
-  // }
+  if (freddy->kinova_right != nullptr)
+  {
+    // freddy->kinova_right->mediator->set_control_mode(0, freddy->kinova_right->state->tau_command);
+    double kr_achd_solver_root_acceleration[6] = {-9.685, -1.033, 1.324, 0.0, 0.0, 0.0};
+    double kr_rne_ext_wrench[7][6]{};
+    double kr_rne_output_torques[7]{};
+    rne_solver(freddy, freddy->kinova_right->base_frame, freddy->kinova_right->tool_frame,
+               kr_achd_solver_root_acceleration, kr_rne_ext_wrench, kr_rne_output_torques);
+    freddy->kinova_right->mediator->set_control_mode(2, kr_rne_output_torques);
+  }
 
   if (freddy->mobile_base != nullptr)
   {
@@ -1075,32 +1075,32 @@ void print_matrix2(int rows, int cols, const double *a)
 
 void print_robot_data(Freddy *rob)
 {
-  // std::cout << "Left arm state: " << std::endl;
-  // std::cout << "-- q: ";
-  // for (size_t i = 0; i < rob->kinova_left->state->nj; i++)
-  // {
-  //   std::cout << rob->kinova_left->state->q[i] << " ";
-  // }
-  // std::cout << std::endl;
-  // std::cout << "-- tool pose: ";
-  // for (size_t i = 0; i < 6; i++)
-  // {
-  //   std::cout << rob->kinova_left->state->s[rob->kinova_left->state->ns - 1][i] << " ";
-  // }
-  // std::cout << std::endl;
-  // std::cout << "-- tool twist: ";
-  // for (size_t i = 0; i < 6; i++)
-  // {
-  //   std::cout << rob->kinova_left->state->s_dot[rob->kinova_left->state->ns - 1][i]
-  //             << " ";
-  // }
-  // std::cout << std::endl;
-  // std::cout << "-- measured torque: ";
-  // for (size_t i = 0; i < rob->kinova_left->state->nj; i++)
-  // {
-  //   std::cout << rob->kinova_left->state->tau_measured[i] << " ";
-  // }
-  // std::cout << std::endl;
+  std::cout << "Left arm state: " << std::endl;
+  std::cout << "-- q: ";
+  for (size_t i = 0; i < rob->kinova_left->state->nj; i++)
+  {
+    std::cout << rob->kinova_left->state->q[i] << " ";
+  }
+  std::cout << std::endl;
+  std::cout << "-- tool pose: ";
+  for (size_t i = 0; i < 6; i++)
+  {
+    std::cout << rob->kinova_left->state->s[rob->kinova_left->state->ns - 1][i] << " ";
+  }
+  std::cout << std::endl;
+  std::cout << "-- tool twist: ";
+  for (size_t i = 0; i < 6; i++)
+  {
+    std::cout << rob->kinova_left->state->s_dot[rob->kinova_left->state->ns - 1][i]
+              << " ";
+  }
+  std::cout << std::endl;
+  std::cout << "-- measured torque: ";
+  for (size_t i = 0; i < rob->kinova_left->state->nj; i++)
+  {
+    std::cout << rob->kinova_left->state->tau_measured[i] << " ";
+  }
+  std::cout << std::endl;
 
   std::cout << "Right arm state: " << std::endl;
   std::cout << "-- q: ";
@@ -1122,27 +1122,6 @@ void print_robot_data(Freddy *rob)
   }
   std::cout << std::endl;
 
-  // std::cout << "Right arm state: " << std::endl;
-  // std::cout << "-- q: ";
-  // for (size_t i = 0; i < rob->kinova_right->state->nj; i++)
-  // {
-  //   std::cout << rob->kinova_right->state->q[i] << " ";
-  // }
-  // std::cout << std::endl;
-  // std::cout << "-- tool pose: ";
-  // for (size_t i = 0; i < 6; i++)
-  // {
-  //   std::cout << rob->kinova_right->state->s[rob->kinova_right->state->ns - 1][i] << "
-  //   ";
-  // }
-  // std::cout << std::endl;
-  // std::cout << "-- tool twist: ";
-  // for (size_t i = 0; i < 6; i++)
-  // {
-  //   std::cout << rob->kinova_right->state->s_dot[rob->kinova_right->state->ns - 1][i]
-  //             << " ";
-  // }
-  // std::cout << std::endl;
 
   // std::cout << "Mobile base state: " << std::endl;
   // std::cout << "-- pivot angles: ";

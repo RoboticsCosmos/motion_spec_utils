@@ -239,6 +239,97 @@ struct LogManipulatorDataVector
   }
 };
 
+struct LogManipulatorVoltageCurrentData
+{
+  double base_voltage;
+  double base_current;
+
+  double actuator_voltage[7];
+  double actuator_current[7];
+
+  void populate(double base_voltage, double base_current, double *actuator_voltage,
+                double *actuator_current)
+  {
+    this->base_voltage = base_voltage;
+    this->base_current = base_current;
+
+    std::memcpy(this->actuator_voltage, actuator_voltage, sizeof(this->actuator_voltage));
+    std::memcpy(this->actuator_current, actuator_current, sizeof(this->actuator_current));
+  }
+};
+
+struct LogManipulatorVoltageCurrentDataVector
+{
+  std::string arm_name;
+  std::vector<LogManipulatorVoltageCurrentData> log_data;
+
+  std::string log_dir;
+  std::string filename;
+  FILE *file;
+
+  // constructor
+  LogManipulatorVoltageCurrentDataVector(std::string arm_name, std::string log_dir)
+  {
+    this->log_dir = log_dir;
+    this->arm_name = arm_name;
+
+    // create the filename
+    this->filename = log_dir + "/" + arm_name + "_voltage_current_log.csv";
+
+    // create the file
+    this->file = fopen(this->filename.c_str(), "w");
+    if (this->file == NULL)
+    {
+      std::cerr << "Error opening file: " << this->filename << std::endl;
+      exit(1);
+    }
+
+    // write the header
+    fprintf(file,
+            "base_voltage,base_current,"
+            "actuator_1_voltage,actuator_2_voltage,actuator_3_voltage,actuator_4_voltage,"
+            "actuator_5_voltage,actuator_6_voltage,actuator_7_voltage,"
+            "actuator_1_current,actuator_2_current,actuator_3_current,actuator_4_current,"
+            "actuator_5_current,actuator_6_current,actuator_7_current\n");
+  }
+
+  // destructor
+  ~LogManipulatorVoltageCurrentDataVector()
+  {
+    fclose(this->file);
+  }
+
+  void addVoltageCurrentData(double base_voltage, double base_current, double *actuator_voltage,
+                             double *actuator_current)
+  {
+    LogManipulatorVoltageCurrentData data;
+    data.populate(base_voltage, base_current, actuator_voltage, actuator_current);
+    this->log_data.push_back(data);
+
+    if (this->log_data.size() >= 100)
+    {
+      writeToOpenFile();
+    }
+  }
+
+  void writeToOpenFile()
+  {
+    for (size_t i = 0; i < this->log_data.size(); i++)
+    {
+      // append all the data to a string
+      std::stringstream ss;
+      ss << this->log_data[i].base_voltage << "," << this->log_data[i].base_current << ",";
+      appendArrayToStream(ss, this->log_data[i].actuator_voltage, 7);
+      appendArrayToStream(ss, this->log_data[i].actuator_current, 7);
+
+      // write the string to the file
+      fprintf(file, "%s\n", ss.str().c_str());
+    }
+    // clear the data
+    this->log_data.clear();
+  }
+};
+
 struct LogMobileBaseData
 {
   // mobile base info
@@ -330,6 +421,91 @@ struct LogMobileBaseDataVector
       appendArrayToStream(ss, this->log_data[i].tau_command, 8);
       appendArrayToStream(ss, this->log_data[i].x_platform, 3);
       appendArrayToStream(ss, this->log_data[i].xd_platform, 3);
+
+      // write the string to the file
+      fprintf(file, "%s\n", ss.str().c_str());
+    }
+    // clear the data
+    this->log_data.clear();
+  }
+};
+
+struct LogMobileBaseVoltageCurrentData
+{
+  double bus_voltages[4];
+
+  double actuator_voltage[8];
+  double actuator_current[8];
+
+  void populate(double *bus_voltages, double *actuator_voltage, double *actuator_current)
+  {
+    std::memcpy(this->bus_voltages, bus_voltages, sizeof(this->bus_voltages));
+    std::memcpy(this->actuator_voltage, actuator_voltage, sizeof(this->actuator_voltage));
+    std::memcpy(this->actuator_current, actuator_current, sizeof(this->actuator_current));
+  }
+};
+
+struct LogMobileBaseVoltageCurrentDataVector
+{
+  std::vector<LogMobileBaseVoltageCurrentData> log_data;
+
+  std::string log_dir;
+  std::string filename;
+  FILE *file;
+
+  // constructor
+  LogMobileBaseVoltageCurrentDataVector(std::string log_dir)
+  {
+    this->log_dir = log_dir;
+
+    // create the filename
+    this->filename = log_dir + "/mobile_base_voltage_current_log.csv";
+
+    // create the file
+    this->file = fopen(this->filename.c_str(), "w");
+    if (this->file == NULL)
+    {
+      std::cerr << "Error opening file: " << this->filename << std::endl;
+      exit(1);
+    }
+
+    // write the header
+    fprintf(file,
+            "bus_voltage_1,bus_voltage_2,bus_voltage_3,bus_voltage_4,"
+            "actuator_1_voltage,actuator_2_voltage,actuator_3_voltage,actuator_4_voltage,"
+            "actuator_5_voltage,actuator_6_voltage,actuator_7_voltage,actuator_8_voltage,"
+            "actuator_1_current,actuator_2_current,actuator_3_current,actuator_4_current,"
+            "actuator_5_current,actuator_6_current,actuator_7_current,actuator_8_current\n");
+  }
+
+  // destructor
+  ~LogMobileBaseVoltageCurrentDataVector()
+  {
+    fclose(this->file);
+  }
+
+  void addVoltageCurrentData(double *bus_voltages, double *actuator_voltage,
+                             double *actuator_current)
+  {
+    LogMobileBaseVoltageCurrentData data;
+    data.populate(bus_voltages, actuator_voltage, actuator_current);
+    this->log_data.push_back(data);
+
+    if (this->log_data.size() >= 100)
+    {
+      writeToOpenFile();
+    }
+  }
+
+  void writeToOpenFile()
+  {
+    for (size_t i = 0; i < this->log_data.size(); i++)
+    {
+      // append all the data to a string
+      std::stringstream ss;
+      appendArrayToStream(ss, this->log_data[i].bus_voltages, 4);
+      appendArrayToStream(ss, this->log_data[i].actuator_voltage, 8);
+      appendArrayToStream(ss, this->log_data[i].actuator_current, 8);
 
       // write the string to the file
       fprintf(file, "%s\n", ss.str().c_str());
