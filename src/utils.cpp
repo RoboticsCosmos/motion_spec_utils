@@ -138,7 +138,8 @@ void free_robot_data(Freddy *rob)
   }
 }
 
-void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
+void initialize_robot(Freddy *freddy, std::string robot_urdf, char *interface,
+                      bool set_torque_ctrl_mode)
 {
   // load the robot urdf
   if (!kdl_parser::treeFromFile(robot_urdf, freddy->tree))
@@ -197,7 +198,7 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
     initialize_mobile_base_state(freddy->mobile_base->state);
   }
 
-  if (freddy->kinova_left != nullptr)
+  if (freddy->kinova_left != nullptr && set_torque_ctrl_mode)
   {
     double kl_achd_solver_root_acceleration[6] = {-9.6, 0.98, 1.42, 0.0, 0.0, 0.0};
     double kl_rne_ext_wrench[7][6]{};
@@ -208,9 +209,8 @@ void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy)
     freddy->kinova_left->mediator->set_control_mode(2, kl_rne_output_torques);
   }
 
-  if (freddy->kinova_right != nullptr)
+  if (freddy->kinova_right != nullptr && set_torque_ctrl_mode)
   {
-    // freddy->kinova_right->mediator->set_control_mode(0, freddy->kinova_right->state->tau_command);
     double kr_achd_solver_root_acceleration[6] = {-9.685, -1.033, 1.324, 0.0, 0.0, 0.0};
     double kr_rne_ext_wrench[7][6]{};
     double kr_rne_output_torques[7]{};
@@ -1091,8 +1091,7 @@ void print_robot_data(Freddy *rob)
   std::cout << "-- tool twist: ";
   for (size_t i = 0; i < 6; i++)
   {
-    std::cout << rob->kinova_left->state->s_dot[rob->kinova_left->state->ns - 1][i]
-              << " ";
+    std::cout << rob->kinova_left->state->s_dot[rob->kinova_left->state->ns - 1][i] << " ";
   }
   std::cout << std::endl;
   std::cout << "-- measured torque: ";
@@ -1121,7 +1120,6 @@ void print_robot_data(Freddy *rob)
     std::cout << rob->kinova_right->state->s_dot[rob->kinova_right->state->ns - 1][i] << " ";
   }
   std::cout << std::endl;
-
 
   // std::cout << "Mobile base state: " << std::endl;
   // std::cout << "-- pivot angles: ";
@@ -1240,4 +1238,3 @@ void write_odom_data_to_open_file(FILE *file, std::vector<std::array<double, 3>>
     fprintf(file, "%f,%f,%f\n", odom_data[i][0], odom_data[i][1], odom_data[i][2]);
   }
 }
-

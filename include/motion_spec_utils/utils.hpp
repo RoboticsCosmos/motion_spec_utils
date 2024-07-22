@@ -105,7 +105,8 @@ void ckpv(Freddy *rob, double dt);
 // void initialize_robot_state(int num_joints, int num_segments, double *init_q,
 //                             Manipulator *rob);
 
-void initialize_robot(std::string robot_urdf, char *interface, Freddy *freddy);
+void initialize_robot(Freddy *freddy, std::string robot_urdf, char *interface,
+                      bool set_torque_ctrl_mode=true);
 
 void initialize_robot_sim(std::string robot_urdf, Freddy *freddy);
 
