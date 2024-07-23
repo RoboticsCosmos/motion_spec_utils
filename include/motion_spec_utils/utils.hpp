@@ -73,6 +73,10 @@
 
 #include "motion_spec_utils/tf_utils.hpp"
 
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+
 /**
  * @brief Initializes the robot state struct.
  * @param num_joints The number of joints.
@@ -235,5 +239,8 @@ void get_new_folder_name(const char *dir_path, char *name);
 void write_odom_data_to_open_file(FILE *file, std::vector<std::array<double, 3>> &odom_data);
 
 void print_matrix2(int rows, int cols, const double *a);
+
+void base_communication_thread(Freddy *rob, double *tau_command, std::mutex &data_mutex,
+                               bool &run_thread, std::condition_variable &cv, bool &communicate);
 
 #endif  // UTILS_HPP

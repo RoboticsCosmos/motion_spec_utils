@@ -592,9 +592,8 @@ void base_fd_solver(Freddy *rob, double *platform_forces, double *wheel_torques)
   init_torque_control_state(torque_control_state, N, M);
   set_weight_matrix(torque_control_state, N, M);
 
-  // *Assumption* - platform_forces is a 6D vector with forces in x, y, z and torques about x, y, z
-  double pf[3] = {platform_forces[0], platform_forces[1], platform_forces[5]};
-  set_platform_force(torque_control_state, pf, N);
+  // *Assumption* - platform_forces is a 3D vector with forces in x, y, and moment about z
+  set_platform_force(torque_control_state, platform_forces, N);
 
   compute_wheel_torques(rob->mobile_base->mediator->kelo_base_config, torque_control_state,
                         rob->mobile_base->state->pivot_angles, wheel_torques, N, M);
@@ -634,7 +633,7 @@ void get_pivot_alignment_offsets(Freddy *robot, double *platform_force, double *
     ang_offsets[i] = atan2(pivot_dir.x() * tangent.y() - pivot_dir.y() * tangent.x(),
                            pivot_dir.x() * tangent.x() + pivot_dir.y() * tangent.y());
 
-    // get the angular offsets between the pivot direction and platform linear force
+    // get the linear offsets between the pivot direction and platform linear force
     lin_offsets[i] =
         atan2(pivot_dir.x() * lin_platform_force.y() - pivot_dir.y() * lin_platform_force.x(),
               pivot_dir.x() * lin_platform_force.x() + pivot_dir.y() * lin_platform_force.y());
