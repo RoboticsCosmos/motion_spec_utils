@@ -71,7 +71,6 @@ target_include_directories(tf_utils PUBLIC
 target_link_libraries(tf_utils 
   kdl_parser  
   orocos-kdl
-  kelo_motion_control
 )
 
 add_library(mutils SHARED src/utils.cpp)
@@ -83,9 +82,8 @@ target_link_libraries(mutils
   kdl_parser
   orocos-kdl
   kinova_mediator
-  KortexApiCpp
+  # KortexApiCpp
   pthread
-  kelo_motion_control
   kelo_kindyn
   tf_utils
   solver_utils

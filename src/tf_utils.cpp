@@ -24,11 +24,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-extern "C"
-{
-#include "kelo_motion_control/mediator.h"
-}
-
 #include "motion_spec_utils/tf_utils.hpp"
 
 void transform_wrench(Freddy *rob, std::string from_ent, std::string to_ent, double *wrench,
