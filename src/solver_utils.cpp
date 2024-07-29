@@ -638,11 +638,9 @@ void get_pivot_alignment_offsets(Freddy *robot, double *platform_force, double *
 }
 
 void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double *linear_offsets,
-                                   double *angular_offsets, double *platform_weights,
-                                   double *wheel_torques)
+                                   double *angular_offsets, double *wheel_torques)
 {
   assert(platform_force);
-  assert(platform_weights);
   assert(wheel_torques);
 
   // transform the platform force by 90 degrees ccw
@@ -650,19 +648,28 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
   Eigen::Vector2d lin_pf = Eigen::Vector2d(platform_force[0], platform_force[1]);
   lin_pf = pf_correction_rot * lin_pf;
 
-  platform_force[0] = lin_pf.x();
-  platform_force[1] = lin_pf.y();
+  double pf[3] = {lin_pf.x(), lin_pf.y(), platform_force[2]};
+
+  // compute the weights for the platform force
+  double platform_weights[2];
+  platform_weights[0] = abs(platform_force[2]) < 1e-6
+                            ? 1.0
+                            : sqrt(pow(platform_force[0], 2) + pow(platform_force[1], 2)) /
+                                  (sqrt(pow(platform_force[0], 2) + pow(platform_force[1], 2) +
+                                        pow(platform_force[2], 2)));
+
+  platform_weights[1] = 1.0 - platform_weights[0];
 
   double lin_force_weight = lin_pf.norm() == 0.0 ? 0.0 : platform_weights[0];
-  double moment_weight = platform_force[2] == 0.0 ? 0.0 : platform_weights[1];
+  double moment_weight = pf[2] == 0.0 ? 0.0 : platform_weights[1];
 
-  double alignment_taus[robot->mobile_base->mediator->kelo_base_config->nWheels];
+  double alignment_taus[robot->mobile_base->mediator->kelo_base_config->nWheels]{};
   for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels; i++)
   {
     alignment_taus[i] = linear_offsets[i] * lin_force_weight + angular_offsets[i] * moment_weight;
   }
 
-  double tau_wheel_ref[robot->mobile_base->mediator->kelo_base_config->nWheels * 2];
+  double tau_wheel_ref[robot->mobile_base->mediator->kelo_base_config->nWheels * 2]{};
   for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels; i++)
   {
     tau_wheel_ref[2 * i] = alignment_taus[i];
@@ -705,6 +712,5 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
                              robot->mobile_base->state->pivot_angles, force_dist_mat_whl);
 
   kelo_pltf_slv_inv_frc_dist_cgls(robot->mobile_base->mediator->kelo_base_config->nWheels,
-                                  force_dist_mat_whl, w_drive, platform_force, tau_wheel_ref,
-                                  wheel_torques);
+                                  force_dist_mat_whl, w_drive, pf, tau_wheel_ref, wheel_torques);
 }

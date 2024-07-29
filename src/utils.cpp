@@ -215,7 +215,7 @@ void initialize_robot(Freddy *freddy, std::string robot_urdf, char *interface,
     freddy->kinova_right->mediator->set_control_mode(2, kr_rne_output_torques);
   }
 
-  if (freddy->mobile_base != nullptr)
+  if (freddy->mobile_base != nullptr && freddy->mobile_base->mediator->ethercat_config != nullptr)
   {
     init_ecx_context(freddy->mobile_base->mediator->ethercat_config);
     int result = 0;
@@ -883,7 +883,7 @@ void get_robot_data(Freddy *freddy, double dt)
                              &freddy->tree);
   }
 
-  if (freddy->mobile_base != nullptr)
+  if (freddy->mobile_base != nullptr && freddy->mobile_base->mediator->ethercat_config != nullptr)
   {
     // printf("Getting mobile base data\n");
     get_kelo_base_state(
