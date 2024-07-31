@@ -890,7 +890,10 @@ void get_robot_data(Freddy *freddy, double dt)
         freddy->mobile_base->mediator->kelo_base_config,
         freddy->mobile_base->mediator->ethercat_config, freddy->mobile_base->state->pivot_angles,
         freddy->mobile_base->state->wheel_encoder_values, freddy->mobile_base->state->qd_wheel);
+  }
 
+  if (freddy->mobile_base != nullptr)
+  {
     compute_kelo_platform_velocity(freddy);
 
     // KDL::Vector vel_vec = KDL::Vector(freddy->mobile_base->state->xd_platform[0],

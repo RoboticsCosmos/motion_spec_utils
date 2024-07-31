@@ -187,7 +187,7 @@ struct LogManipulatorDataVector
     // write the header
     fprintf(file,
             "ee_s_x,ee_s_y,ee_s_z,ee_s_qx,ee_s_qy,ee_s_qz,ee_s_qw,"
-            "ee_twist_x,ee_twist_y,ee_twist_z,ee_twist_qx,ee_twist_qy,ee_twist_qz"
+            "ee_twist_x,ee_twist_y,ee_twist_z,ee_twist_qx,ee_twist_qy,ee_twist_qz,"
             "elbow_s_x,elbow_s_y,elbow_s_z,elbow_s_qx,elbow_s_qy,elbow_s_qz,elbow_s_qw,"
             "arm_base_s_x,arm_base_s_y,arm_base_s_z,arm_base_s_qx,arm_base_s_qy,arm_base_s_qz,arm_"
             "base_s_qw,"
