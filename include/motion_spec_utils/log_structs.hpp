@@ -83,11 +83,11 @@ struct LogControlDataVector
     // write the header
     if (controller_type == "pid")
     {
-      fprintf(file, "reference_value,measured_value,error,control_signal,p,i,d,error_sum\n");
+      fprintf(file, "measured_value,reference_value,error,control_signal,p,i,d,error_sum\n");
     }
     else if (controller_type == "impedance")
     {
-      fprintf(file, "reference_value,measured_value,control_signal,stiffness,damping\n");
+      fprintf(file, "measured_value,reference_value,control_signal,stiffness,damping\n");
     }
   }
 
