@@ -676,6 +676,20 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
     tau_wheel_ref[2 * i + 1] = -alignment_taus[i];
   }
 
+  double tau_wheel_ref_limit  = 10.0;
+
+  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels * 2; i++)
+  {
+    if (tau_wheel_ref[i] > tau_wheel_ref_limit)
+    {
+      tau_wheel_ref[i] = tau_wheel_ref_limit;
+    }
+    else if (tau_wheel_ref[i] < -tau_wheel_ref_limit)
+    {
+      tau_wheel_ref[i] = -tau_wheel_ref_limit;
+    }
+  }
+
   // solver
   // initialize variables
   double caster_offsets[robot->mobile_base->mediator->kelo_base_config->nWheels]{};
@@ -711,6 +725,34 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
                              caster_offsets, wheel_distances, wheel_diameters,
                              robot->mobile_base->state->pivot_angles, force_dist_mat_whl);
 
+  // printf("\n");
+  // printf("[");
+  // for (int m_ = 0; m_ < 3; m_++) {
+  //     printf("[");
+  //     for (int n_ = 0; n_ < 8; n_++) {
+  //         printf("%10f", force_dist_mat_whl[m_ + n_ * 3]);
+  //         if (n_ != 8 - 1) printf(", ");
+  //     }
+  //     printf("]");
+  //     if (m_ != 3 - 1) printf(",\n ");
+  // }
+  // printf("]");
+  // printf("\n");
+
   kelo_pltf_slv_inv_frc_dist_cgls(robot->mobile_base->mediator->kelo_base_config->nWheels,
                                   force_dist_mat_whl, w_drive, pf, tau_wheel_ref, wheel_torques);
+
+  double f_platform_out[3];
+
+  kelo_pltf_slv_fwd_frc_comp(4,
+            force_dist_mat_whl,
+            wheel_torques,
+            f_platform_out);
+
+  printf("f_platform_out: ");
+  for (size_t i = 0; i < 3; i++)
+  {
+    std::cout << f_platform_out[i] << " ";
+  }
+  std::cout << std::endl;
 }

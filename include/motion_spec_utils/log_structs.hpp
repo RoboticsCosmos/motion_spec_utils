@@ -17,36 +17,60 @@ void appendArrayToStream(std::stringstream &ss, double *arr, size_t size)
 
 struct LogControlData
 {
-  double measured_value;
-  double reference_value;
+  double measured_value = 0.0;
+  double reference_value = 0.0;
+  double error = 0.0;
+  double control_singal = 0.0;
 
-  double control_singal;
+  double p, i, d, error_sum = 0.0;
+  double stiffness, damping = 0.0;
 
-  void populate(double measured_value, double reference_value, double control_signal)
+  void populate(double measured_value, double reference_value, double error, double control_signal)
   {
     this->measured_value = measured_value;
     this->reference_value = reference_value;
+    this->error = error;
     this->control_singal = control_signal;
+  }
+
+  void populate_pid_ctrl(double p, double i, double d, double error_sum)
+  {
+    this->p = p;
+    this->i = i;
+    this->d = d;
+    this->error_sum = error_sum;
+  }
+
+  void populate_impedance_ctrl(double stiffness, double damping)
+  {
+    this->stiffness = stiffness;
+    this->damping = damping;
   }
 };
 
 struct LogControlDataVector
 {
   std::string control_variable;
+  std::string controller_type;
   std::vector<LogControlData> control_data;
 
   std::string log_dir;
   std::string filename;
   FILE *file;
 
+  int write_frequency = 0;
+
   // constructor
-  LogControlDataVector(std::string control_variable, std::string log_dir)
+  LogControlDataVector(std::string control_variable, std::string controller_type,
+                       std::string log_dir, int write_frequency = 50)
   {
     this->control_variable = control_variable;
+    this->controller_type = controller_type;
     this->log_dir = log_dir;
+    this->write_frequency = write_frequency;
 
     // create the filename
-    this->filename = log_dir + "/control_log_" + control_variable + ".csv";
+    this->filename = log_dir + "/control_log_" + control_variable + "_" + controller_type + ".csv";
 
     // create the file
     this->file = fopen(this->filename.c_str(), "w");
@@ -57,7 +81,14 @@ struct LogControlDataVector
     }
 
     // write the header
-    fprintf(file, "Reference Value,Measured Value,Control Signal\n");
+    if (controller_type == "pid")
+    {
+      fprintf(file, "reference_value,measured_value,error,control_signal,p,i,d,error_sum\n");
+    }
+    else if (controller_type == "impedance")
+    {
+      fprintf(file, "reference_value,measured_value,control_signal,stiffness,damping\n");
+    }
   }
 
   // destructor
@@ -66,13 +97,29 @@ struct LogControlDataVector
     fclose(this->file);
   }
 
-  void addControlData(double measured_value, double reference_value, double control_signal)
+  void addControlDataPID(double measured_value, double reference_value, double error,
+                         double control_signal, double p, double i, double d, double error_sum)
   {
     LogControlData data;
-    data.populate(measured_value, reference_value, control_signal);
+    data.populate(measured_value, reference_value, error, control_signal);
+    data.populate_pid_ctrl(p, i, d, error_sum);
     this->control_data.push_back(data);
 
-    if (this->control_data.size() >= 100)
+    if (this->control_data.size() >= this->write_frequency)
+    {
+      writeToOpenFile();
+    }
+  }
+
+  void addControlDataImpedance(double measured_value, double reference_value, double error,
+                               double control_signal, double stiffness, double damping)
+  {
+    LogControlData data;
+    data.populate(measured_value, reference_value, error, control_signal);
+    data.populate_impedance_ctrl(stiffness, damping);
+    this->control_data.push_back(data);
+
+    if (this->control_data.size() >= 50)
     {
       writeToOpenFile();
     }
@@ -82,8 +129,24 @@ struct LogControlDataVector
   {
     for (size_t i = 0; i < this->control_data.size(); i++)
     {
-      fprintf(file, "%f,%f,%f\n", this->control_data[i].reference_value,
-              this->control_data[i].measured_value, this->control_data[i].control_singal);
+      // append all the data to a string
+      std::stringstream ss;
+      ss << this->control_data[i].reference_value << "," << this->control_data[i].measured_value
+         << "," << this->control_data[i].error << "," << this->control_data[i].control_singal
+         << ",";
+
+      if (this->controller_type == "pid")
+      {
+        ss << this->control_data[i].p << "," << this->control_data[i].i << ","
+           << this->control_data[i].d << "," << this->control_data[i].error_sum;
+      }
+      else if (this->controller_type == "impedance")
+      {
+        ss << this->control_data[i].stiffness << "," << this->control_data[i].damping;
+      }
+
+      // write the string to the file
+      fprintf(file, "%s\n", ss.str().c_str());
     }
     // clear the data
     this->control_data.clear();
@@ -166,12 +229,14 @@ struct LogManipulatorDataVector
   std::string log_dir;
   std::string filename;
   FILE *file;
+  int write_frequency = 0;
 
   // constructor
-  LogManipulatorDataVector(std::string arm_name, std::string log_dir)
+  LogManipulatorDataVector(std::string arm_name, std::string log_dir, int write_frequncy = 50)
   {
     this->log_dir = log_dir;
     this->arm_name = arm_name;
+    this->write_frequency = write_frequncy;
 
     // create the filename
     this->filename = log_dir + "/" + arm_name + "_log.csv";
@@ -210,7 +275,7 @@ struct LogManipulatorDataVector
     data.populate(rob, beta, tau_command, f_tool_command);
     this->log_data.push_back(data);
 
-    if (this->log_data.size() >= 100)
+    if (this->log_data.size() >= this->write_frequency)
     {
       writeToOpenFile();
     }
@@ -306,7 +371,7 @@ struct LogManipulatorVoltageCurrentDataVector
     data.populate(base_voltage, base_current, actuator_voltage, actuator_current);
     this->log_data.push_back(data);
 
-    if (this->log_data.size() >= 100)
+    if (this->log_data.size() >= 50)
     {
       writeToOpenFile();
     }
@@ -354,8 +419,8 @@ struct LogMobileBaseData
 
   void populateSolverData(double *platform_force, double *tau_command)
   {
-    std::memcpy(this->platform_force, platform_force, sizeof(this->platform_force));
-    std::memcpy(this->tau_command, tau_command, sizeof(this->tau_command));
+    if (platform_force != nullptr) std::memcpy(this->platform_force, platform_force, sizeof(this->platform_force));
+    if (tau_command != nullptr) std::memcpy(this->tau_command, tau_command, sizeof(this->tau_command));
   }
 };
 
@@ -366,11 +431,13 @@ struct LogMobileBaseDataVector
   std::string log_dir;
   std::string filename;
   FILE *file;
+  int write_frequency = 0;
 
   // constructor
-  LogMobileBaseDataVector(std::string log_dir)
+  LogMobileBaseDataVector(std::string log_dir, int write_freuqency = 50)
   {
     this->log_dir = log_dir;
+    this->write_frequency = write_freuqency;
 
     // create the filename
     this->filename = log_dir + "/mobile_base_log.csv";
@@ -397,14 +464,16 @@ struct LogMobileBaseDataVector
     fclose(this->file);
   }
 
-  void addMobileBaseData(RobileBase *rob, double *x_platform, double *xd_platform)
+  void addMobileBaseData(RobileBase *rob, double *x_platform, double *xd_platform, double *platform_force,
+                         double *tau_command)
   {
     LogMobileBaseData data;
     data.populateMobileBaseData(rob);
     data.setPlatformData(x_platform, xd_platform);
+    data.populateSolverData(platform_force, tau_command);
     this->log_data.push_back(data);
 
-    if (this->log_data.size() >= 100)
+    if (this->log_data.size() >= this->write_frequency)
     {
       writeToOpenFile();
     }
@@ -491,7 +560,7 @@ struct LogMobileBaseVoltageCurrentDataVector
     data.populate(bus_voltages, actuator_voltage, actuator_current);
     this->log_data.push_back(data);
 
-    if (this->log_data.size() >= 100)
+    if (this->log_data.size() >= 50)
     {
       writeToOpenFile();
     }
