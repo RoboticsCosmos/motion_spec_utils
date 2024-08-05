@@ -643,6 +643,9 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
   assert(platform_force);
   assert(wheel_torques);
 
+  size_t nWheels = robot->mobile_base->mediator->kelo_base_config->nWheels;
+  assert(nWheels > 0);
+
   // transform the platform force by 90 degrees ccw
   Eigen::Rotation2Dd pf_correction_rot(M_PI / 2);
   Eigen::Vector2d lin_pf = Eigen::Vector2d(platform_force[0], platform_force[1]);
@@ -663,22 +666,22 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
   double lin_force_weight = lin_pf.norm() == 0.0 ? 0.0 : platform_weights[0];
   double moment_weight = pf[2] == 0.0 ? 0.0 : platform_weights[1];
 
-  double alignment_taus[robot->mobile_base->mediator->kelo_base_config->nWheels]{};
-  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels; i++)
+  double alignment_taus[nWheels]{};
+  for (size_t i = 0; i < nWheels; i++)
   {
     alignment_taus[i] = linear_offsets[i] * lin_force_weight + angular_offsets[i] * moment_weight;
   }
 
-  double tau_wheel_ref[robot->mobile_base->mediator->kelo_base_config->nWheels * 2]{};
-  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels; i++)
+  double tau_wheel_ref[nWheels * 2]{};
+  for (size_t i = 0; i < nWheels; i++)
   {
     tau_wheel_ref[2 * i] = alignment_taus[i];
     tau_wheel_ref[2 * i + 1] = -alignment_taus[i];
   }
 
-  double tau_wheel_ref_limit  = 10.0;
+  double tau_wheel_ref_limit = 10.0;
 
-  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels * 2; i++)
+  for (size_t i = 0; i < nWheels * 2; i++)
   {
     if (tau_wheel_ref[i] > tau_wheel_ref_limit)
     {
@@ -692,26 +695,25 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
 
   // solver
   // initialize variables
-  double caster_offsets[robot->mobile_base->mediator->kelo_base_config->nWheels]{};
-  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels; i++)
+  double caster_offsets[nWheels]{};
+  for (size_t i = 0; i < nWheels; i++)
   {
     caster_offsets[i] = robot->mobile_base->mediator->kelo_base_config->castor_offset;
   }
 
-  double wheel_distances[robot->mobile_base->mediator->kelo_base_config->nWheels]{};
-  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels; i++)
+  double wheel_distances[nWheels]{};
+  for (size_t i = 0; i < nWheels; i++)
   {
     wheel_distances[i] = robot->mobile_base->mediator->kelo_base_config->half_wheel_distance * 2;
   }
 
   double wheel_diameters[8]{};
-  for (size_t i = 0; i < robot->mobile_base->mediator->kelo_base_config->nWheels * 2; i++)
+  for (size_t i = 0; i < nWheels * 2; i++)
   {
     wheel_diameters[i] = robot->mobile_base->mediator->kelo_base_config->radius * 2;
   }
 
-  double w_drive[robot->mobile_base->mediator->kelo_base_config->nWheels *
-                 robot->mobile_base->mediator->kelo_base_config->nWheels] = {
+  double w_drive[nWheels * nWheels] = {
       // [1/N^2]
       1.0, 0.0, 0.0, 1.0,  // fl-xx, fl-xy, fl-yx, fl-yy
       1.0, 0.0, 0.0, 1.0,  // rl-xx, rl-xy, rl-yx, rl-yy
@@ -719,8 +721,8 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
       1.0, 0.0, 0.0, 1.0   // fr-xx, fr-xy, fr-yx, fr-yy
   };
 
-  double force_dist_mat_whl[3 * 2 * robot->mobile_base->mediator->kelo_base_config->nWheels];
-  kelo_pltf_frc_comp_mat_whl(robot->mobile_base->mediator->kelo_base_config->nWheels,
+  double force_dist_mat_whl[3 * 2 * nWheels];
+  kelo_pltf_frc_comp_mat_whl(nWheels,
                              robot->mobile_base->mediator->kelo_base_config->wheel_coordinates,
                              caster_offsets, wheel_distances, wheel_diameters,
                              robot->mobile_base->state->pivot_angles, force_dist_mat_whl);
@@ -739,20 +741,13 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
   // printf("]");
   // printf("\n");
 
-  kelo_pltf_slv_inv_frc_dist_cgls(robot->mobile_base->mediator->kelo_base_config->nWheels,
-                                  force_dist_mat_whl, w_drive, pf, tau_wheel_ref, wheel_torques);
+  kelo_pltf_slv_inv_frc_dist_cgls(nWheels, force_dist_mat_whl, w_drive, pf, tau_wheel_ref,
+                                  wheel_torques);
 
-  double f_platform_out[3];
+  // double f_platform_out[3];
 
-  kelo_pltf_slv_fwd_frc_comp(4,
-            force_dist_mat_whl,
-            wheel_torques,
-            f_platform_out);
-
-  printf("f_platform_out: ");
-  for (size_t i = 0; i < 3; i++)
-  {
-    std::cout << f_platform_out[i] << " ";
-  }
-  std::cout << std::endl;
+  // kelo_pltf_slv_fwd_frc_comp(4,
+  //           force_dist_mat_whl,
+  //           wheel_torques,
+  //           f_platform_out);
 }

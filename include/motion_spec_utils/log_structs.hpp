@@ -173,6 +173,7 @@ struct LogManipulatorData
   double beta[6]{};
   double tau_command[7]{};
   double f_tool_command[6]{};
+  double f_elbow_command[6]{};
   // double q_ddot[7]{};
 
   // add methods to populate the data
@@ -193,7 +194,8 @@ struct LogManipulatorData
                 sizeof(this->arm_base_pose));
   }
 
-  void populateAchdData(double *beta, double *tau_command, double *f_tool_command)
+  void populateAchdData(double *beta, double *tau_command, double *f_tool_command,
+                        double *f_elbow_command)
   {
     std::memcpy(this->tau_command, tau_command, sizeof(this->tau_command));
 
@@ -211,13 +213,18 @@ struct LogManipulatorData
     {
       std::memcpy(this->f_tool_command, f_tool_command, sizeof(this->f_tool_command));
     }
+
+    if (f_elbow_command != nullptr)
+    {
+      std::memcpy(this->f_elbow_command, f_elbow_command, sizeof(this->f_elbow_command));
+    }
   }
 
   void populate(Manipulator<kinova_mediator> *rob, double *beta, double *tau_command,
-                double *f_tool_command)
+                double *f_tool_command, double *f_elbow_command)
   {
     populateManipulatorData(rob);
-    populateAchdData(beta, tau_command, f_tool_command);
+    populateAchdData(beta, tau_command, f_tool_command, f_elbow_command);
   }
 };
 
@@ -259,7 +266,8 @@ struct LogManipulatorDataVector
             "ee_f_e_x, ee_f_e_y, ee_f_e_z, ee_f_e_qx, ee_f_e_qy, ee_f_e_qz,"
             "ee_beta_x,ee_beta_y,ee_beta_z,ee_beta_qx,ee_beta_qy,ee_beta_qz,"
             "tau_c_1,tau_c_2,tau_c_3,tau_c_4,tau_c_5,tau_c_6,tau_c_7,"
-            "ee_f_c_x,ee_f_c_y,ee_f_c_z,ee_f_c_qx,ee_f_c_qy,ee_f_c_qz\n");
+            "ee_f_c_x,ee_f_c_y,ee_f_c_z,ee_f_c_qx,ee_f_c_qy,ee_f_c_qz,"
+            "elbow_f_c_x,elbow_f_c_y,elbow_f_c_z,elbow_f_c_qx,elbow_f_c_qy,elbow_f_c_qz\n");
   }
 
   // destructor
@@ -269,10 +277,10 @@ struct LogManipulatorDataVector
   }
 
   void addManipulatorData(Manipulator<kinova_mediator> *rob, double *beta, double *tau_command,
-                          double *f_tool_command)
+                          double *f_tool_command, double *f_elbow_command)
   {
     LogManipulatorData data;
-    data.populate(rob, beta, tau_command, f_tool_command);
+    data.populate(rob, beta, tau_command, f_tool_command, f_elbow_command);
     this->log_data.push_back(data);
 
     if (this->log_data.size() >= this->write_frequency)
@@ -295,6 +303,7 @@ struct LogManipulatorDataVector
       appendArrayToStream(ss, this->log_data[i].beta, 6);
       appendArrayToStream(ss, this->log_data[i].tau_command, 7);
       appendArrayToStream(ss, this->log_data[i].f_tool_command, 6);
+      appendArrayToStream(ss, this->log_data[i].f_elbow_command, 6);
 
       // write the string to the file
       fprintf(file, "%s\n", ss.str().c_str());
