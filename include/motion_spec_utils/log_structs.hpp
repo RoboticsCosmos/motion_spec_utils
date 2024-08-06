@@ -153,6 +153,128 @@ struct LogControlDataVector
   }
 };
 
+struct LogUCData
+{
+  double dist_sp = 0.0;
+
+  double kl_bl_base_dist = 0.0;
+  double kr_bl_base_dist = 0.0;
+
+  double kl_bl_base_f_mag = 0.0;
+  double kr_bl_base_f_mag = 0.0;
+
+  double kl_bl_base_f_dir[3]{};
+  double kr_bl_base_f_dir[3]{};
+
+  double kl_bl_base_f_at_base[3]{};
+  double kr_bl_base_f_at_base[3]{};
+
+  void populate(double dist_sp, double kl_bl_base_dist, double kr_bl_base_dist,
+                double kl_bl_base_f_mag, double kr_bl_base_f_mag, double *kl_bl_base_f_dir,
+                double *kr_bl_base_f_dir, double *kl_bl_base_f_at_base,
+                double *kr_bl_base_f_at_base)
+  {
+    this->dist_sp = dist_sp;
+
+    this->kl_bl_base_dist = kl_bl_base_dist;
+    this->kr_bl_base_dist = kr_bl_base_dist;
+
+    this->kl_bl_base_f_mag = kl_bl_base_f_mag;
+    this->kr_bl_base_f_mag = kr_bl_base_f_mag;
+
+    if (kl_bl_base_f_dir != nullptr)
+      std::memcpy(this->kl_bl_base_f_dir, kl_bl_base_f_dir, sizeof(this->kl_bl_base_f_dir));
+    if (kr_bl_base_f_dir != nullptr)
+      std::memcpy(this->kr_bl_base_f_dir, kr_bl_base_f_dir, sizeof(this->kr_bl_base_f_dir));
+
+    if (kl_bl_base_f_at_base != nullptr)
+      std::memcpy(this->kl_bl_base_f_at_base, kl_bl_base_f_at_base,
+                  sizeof(this->kl_bl_base_f_at_base));
+    if (kr_bl_base_f_at_base != nullptr)
+      std::memcpy(this->kr_bl_base_f_at_base, kr_bl_base_f_at_base,
+                  sizeof(this->kr_bl_base_f_at_base));
+  }
+};
+
+struct LogUCDataVector
+{
+  std::vector<LogUCData> log_data;
+
+  std::string log_dir;
+  std::string filename;
+  FILE *file;
+  int write_frequency = 0;
+
+  // constructor
+  LogUCDataVector(std::string log_dir, int write_frequency = 50)
+  {
+    this->log_dir = log_dir;
+    this->write_frequency = write_frequency;
+
+    // create the filename
+    this->filename = log_dir + "/uc_log.csv";
+
+    // create the file
+    this->file = fopen(this->filename.c_str(), "w");
+    if (this->file == NULL)
+    {
+      std::cerr << "Error opening file: " << this->filename << std::endl;
+      exit(1);
+    }
+
+    // write the header
+    fprintf(file,
+            "dist_sp,kl_bl_base_dist,kr_bl_base_dist,kl_bl_base_f_mag,kr_bl_base_f_mag,"
+            "kl_bl_base_f_dir_x,kl_bl_base_f_dir_y,kl_bl_base_f_dir_z,"
+            "kr_bl_base_f_dir_x,kr_bl_base_f_dir_y,kr_bl_base_f_dir_z,"
+            "kl_bl_base_f_at_base_x,kl_bl_base_f_at_base_y,kl_bl_base_f_at_base_mz,"
+            "kr_bl_base_f_at_base_x,kr_bl_base_f_at_base_y,kr_bl_base_f_at_base_mz\n");
+  }
+
+  // destructor
+  ~LogUCDataVector()
+  {
+    fclose(this->file);
+  }
+
+  void addUCData(double dist_sp, double kl_bl_base_dist, double kr_bl_base_dist,
+                 double kl_bl_base_f_mag, double kr_bl_base_f_mag, double *kl_bl_base_f_dir,
+                 double *kr_bl_base_f_dir, double *kl_bl_base_f_at_base,
+                 double *kr_bl_base_f_at_base)
+  {
+    LogUCData data;
+    data.populate(dist_sp, kl_bl_base_dist, kr_bl_base_dist, kl_bl_base_f_mag, kr_bl_base_f_mag,
+                  kl_bl_base_f_dir, kr_bl_base_f_dir, kl_bl_base_f_at_base, kr_bl_base_f_at_base);
+    this->log_data.push_back(data);
+
+    if (this->log_data.size() >= this->write_frequency)
+    {
+      writeToOpenFile();
+    }
+  }
+
+  void writeToOpenFile()
+  {
+    for (size_t i = 0; i < this->log_data.size(); i++)
+    {
+      // append all the data to a string
+      std::stringstream ss;
+      ss << this->log_data[i].dist_sp << "," << this->log_data[i].kl_bl_base_dist << ","
+         << this->log_data[i].kr_bl_base_dist << "," << this->log_data[i].kl_bl_base_f_mag << ","
+         << this->log_data[i].kr_bl_base_f_mag << ",";
+      appendArrayToStream(ss, this->log_data[i].kl_bl_base_f_dir, 3);
+      appendArrayToStream(ss, this->log_data[i].kr_bl_base_f_dir, 3);
+      appendArrayToStream(ss, this->log_data[i].kl_bl_base_f_at_base, 3);
+      appendArrayToStream(ss, this->log_data[i].kr_bl_base_f_at_base, 3);
+
+      // write the string to the file
+      fprintf(file, "%s\n", ss.str().c_str());
+    }
+    // clear the data
+    this->log_data.clear();
+  }
+};
+
 struct LogManipulatorData
 {
   // kinova info
@@ -428,8 +550,10 @@ struct LogMobileBaseData
 
   void populateSolverData(double *platform_force, double *tau_command)
   {
-    if (platform_force != nullptr) std::memcpy(this->platform_force, platform_force, sizeof(this->platform_force));
-    if (tau_command != nullptr) std::memcpy(this->tau_command, tau_command, sizeof(this->tau_command));
+    if (platform_force != nullptr)
+      std::memcpy(this->platform_force, platform_force, sizeof(this->platform_force));
+    if (tau_command != nullptr)
+      std::memcpy(this->tau_command, tau_command, sizeof(this->tau_command));
   }
 };
 
@@ -473,8 +597,8 @@ struct LogMobileBaseDataVector
     fclose(this->file);
   }
 
-  void addMobileBaseData(RobileBase *rob, double *x_platform, double *xd_platform, double *platform_force,
-                         double *tau_command)
+  void addMobileBaseData(RobileBase *rob, double *x_platform, double *xd_platform,
+                         double *platform_force, double *tau_command)
   {
     LogMobileBaseData data;
     data.populateMobileBaseData(rob);
