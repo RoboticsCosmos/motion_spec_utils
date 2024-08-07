@@ -194,7 +194,8 @@ void initialize_robot(Freddy *freddy, std::string robot_urdf, char *interface,
     initialize_mobile_base_state(freddy->mobile_base->state);
   }
 
-  if (freddy->kinova_left->mediator != nullptr && set_torque_ctrl_mode)
+  if (freddy->kinova_left != nullptr && freddy->kinova_left->mediator != nullptr &&
+      set_torque_ctrl_mode)
   {
     double kl_achd_solver_root_acceleration[6] = {-9.6, 0.98, 1.42, 0.0, 0.0, 0.0};
     double kl_rne_ext_wrench[7][6]{};
@@ -205,7 +206,8 @@ void initialize_robot(Freddy *freddy, std::string robot_urdf, char *interface,
     freddy->kinova_left->mediator->set_control_mode(2, kl_rne_output_torques);
   }
 
-  if (freddy->kinova_right->mediator != nullptr && set_torque_ctrl_mode)
+  if (freddy->kinova_right != nullptr && freddy->kinova_right->mediator != nullptr &&
+      set_torque_ctrl_mode)
   {
     double kr_achd_solver_root_acceleration[6] = {-9.685, -1.033, 1.324, 0.0, 0.0, 0.0};
     double kr_rne_ext_wrench[7][6]{};

@@ -626,14 +626,29 @@ void get_pivot_alignment_offsets(Freddy *robot, double *platform_force, double *
     // moment if the moment is positive, the tangents are in ccw, otherwise in cw
     Eigen::Vector2d tangent = platform_force[2] > 0 ? rot_ccw * attachment : rot_cw * attachment;
 
-    // get the angular offsets between the pivot direction and the tangent
+    // skip if platform force is zero
+    if (lin_platform_force.norm() == 0.0)
+    {
+      lin_offsets[i] = 0.0;
+    }
+    else
+    {
+      // get the linear offsets between the pivot direction and platform linear force
+      lin_offsets[i] =
+          atan2(pivot_dir.x() * lin_platform_force.y() - pivot_dir.y() * lin_platform_force.x(),
+                pivot_dir.x() * lin_platform_force.x() + pivot_dir.y() * lin_platform_force.y());
+    }
+
+    if (platform_force[2] == 0.0)
+    {
+      ang_offsets[i] = 0.0;
+    }
+    else
+    {
+      // get the angular offsets between the pivot direction and the tangent
     ang_offsets[i] = atan2(pivot_dir.x() * tangent.y() - pivot_dir.y() * tangent.x(),
                            pivot_dir.x() * tangent.x() + pivot_dir.y() * tangent.y());
-
-    // get the linear offsets between the pivot direction and platform linear force
-    lin_offsets[i] =
-        atan2(pivot_dir.x() * lin_platform_force.y() - pivot_dir.y() * lin_platform_force.x(),
-              pivot_dir.x() * lin_platform_force.x() + pivot_dir.y() * lin_platform_force.y());
+    }
   }
 }
 
@@ -679,7 +694,7 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
     tau_wheel_ref[2 * i + 1] = -alignment_taus[i];
   }
 
-  double tau_wheel_ref_limit = 10.0;
+  double tau_wheel_ref_limit = 4.0;
 
   for (size_t i = 0; i < nWheels * 2; i++)
   {
