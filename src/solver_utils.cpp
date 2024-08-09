@@ -646,8 +646,8 @@ void get_pivot_alignment_offsets(Freddy *robot, double *platform_force, double *
     else
     {
       // get the angular offsets between the pivot direction and the tangent
-    ang_offsets[i] = atan2(pivot_dir.x() * tangent.y() - pivot_dir.y() * tangent.x(),
-                           pivot_dir.x() * tangent.x() + pivot_dir.y() * tangent.y());
+      ang_offsets[i] = atan2(pivot_dir.x() * tangent.y() - pivot_dir.y() * tangent.x(),
+                             pivot_dir.x() * tangent.x() + pivot_dir.y() * tangent.y());
     }
   }
 }
@@ -664,7 +664,7 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
   // transform the platform force by 90 degrees ccw
   Eigen::Rotation2Dd pf_correction_rot(M_PI / 2);
   Eigen::Vector2d lin_pf = Eigen::Vector2d(platform_force[0], platform_force[1]);
-  lin_pf = pf_correction_rot * lin_pf;
+  // lin_pf = pf_correction_rot * lin_pf;
 
   double pf[3] = {lin_pf.x(), lin_pf.y(), platform_force[2]};
 
@@ -690,23 +690,23 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
   double tau_wheel_ref[nWheels * 2]{};
   for (size_t i = 0; i < nWheels; i++)
   {
-    tau_wheel_ref[2 * i] = alignment_taus[i];
+    tau_wheel_ref[2 * i] = -alignment_taus[i];
     tau_wheel_ref[2 * i + 1] = -alignment_taus[i];
   }
 
-  double tau_wheel_ref_limit = 4.0;
+  // double tau_wheel_ref_limit = 4.0;
 
-  for (size_t i = 0; i < nWheels * 2; i++)
-  {
-    if (tau_wheel_ref[i] > tau_wheel_ref_limit)
-    {
-      tau_wheel_ref[i] = tau_wheel_ref_limit;
-    }
-    else if (tau_wheel_ref[i] < -tau_wheel_ref_limit)
-    {
-      tau_wheel_ref[i] = -tau_wheel_ref_limit;
-    }
-  }
+  // for (size_t i = 0; i < nWheels * 2; i++)
+  // {
+  //   if (tau_wheel_ref[i] > tau_wheel_ref_limit)
+  //   {
+  //     tau_wheel_ref[i] = tau_wheel_ref_limit;
+  //   }
+  //   else if (tau_wheel_ref[i] < -tau_wheel_ref_limit)
+  //   {
+  //     tau_wheel_ref[i] = -tau_wheel_ref_limit;
+  //   }
+  // }
 
   // solver
   // initialize variables

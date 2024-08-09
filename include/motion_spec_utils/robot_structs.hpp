@@ -40,6 +40,7 @@ typedef Manipulator<kinova_mediator> KinovaManipulator;
 struct MobileBaseState
 {
   double *pivot_angles;
+  double *pivot_velocities;
   double *wheel_encoder_values;
   double *prev_wheel_encoder_values;
   double *qd_wheel;

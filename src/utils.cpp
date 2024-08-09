@@ -79,6 +79,7 @@ void free_manipulator_state(ManipulatorState *rob)
 void initialize_mobile_base_state(MobileBaseState *base)
 {
   base->pivot_angles = new double[4]{};
+  base->pivot_velocities = new double[4]{};
   base->wheel_encoder_values = new double[8]{};
   base->prev_wheel_encoder_values = new double[8]{};
   base->qd_wheel = new double[8]{};
@@ -92,6 +93,7 @@ void initialize_mobile_base_state(MobileBaseState *base)
 void free_mobile_base_state(MobileBaseState *base)
 {
   delete[] base->pivot_angles;
+  delete[] base->pivot_velocities;
   delete[] base->wheel_encoder_values;
   delete[] base->prev_wheel_encoder_values;
   delete[] base->qd_wheel;
@@ -891,6 +893,7 @@ void get_robot_data(Freddy *freddy, double dt)
     get_kelo_base_state(
         freddy->mobile_base->mediator->kelo_base_config,
         freddy->mobile_base->mediator->ethercat_config, freddy->mobile_base->state->pivot_angles,
+        freddy->mobile_base->state->pivot_velocities,
         freddy->mobile_base->state->wheel_encoder_values, freddy->mobile_base->state->qd_wheel);
   }
 
