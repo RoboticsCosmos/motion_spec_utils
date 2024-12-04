@@ -23,7 +23,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "kelo_motion_control/mediator.h"
+#include "kelo_platform/Mediator.h"
 #include "motion_spec_utils/utils.hpp"
 #include "motion_spec_utils/solver_utils.hpp"
 
@@ -223,8 +223,10 @@ void initialize_robot(Freddy *freddy, std::string robot_urdf, char *interface,
   {
     init_ecx_context(freddy->mobile_base->mediator->ethercat_config);
     int result = 0;
+    uint32 pmu_command = BASE_DON_TORSO_ON;
     establish_kelo_base_connection(freddy->mobile_base->mediator->kelo_base_config,
                                    freddy->mobile_base->mediator->ethercat_config, interface,
+                                    pmu_command,
                                    &result);
 
     if (result != 0)

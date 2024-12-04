@@ -2,7 +2,7 @@
 #define ROB_STRUCTS_HPP
 
 #include "kinova_mediator/mediator.hpp"
-#include "kelo_motion_control/mediator.h"
+#include "kelo_platform/Mediator.h"
 
 #include <kdl/tree.hpp>
 #include <kdl/chain.hpp>

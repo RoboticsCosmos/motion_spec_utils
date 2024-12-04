@@ -98,4 +98,7 @@ void get_pivot_alignment_offsets(Freddy *robot, double *platform_force, double *
 void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double *linear_offsets,
                                    double *angular_offsets, double *wheel_torques);
 
+void base_fd_solver_cgls(Freddy *robot, double *platform_force, double *alignment_taus,
+                                    double *wheel_torques);
+
 #endif  // SOLVER_UTILS_HPP

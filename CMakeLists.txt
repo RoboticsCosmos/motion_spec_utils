@@ -21,7 +21,7 @@ find_package(Eigen3 REQUIRED)
 find_package(kdl_parser REQUIRED)
 find_package(orocos_kdl REQUIRED)
 find_package(kinova_mediator REQUIRED)
-find_package(kelo_motion_control REQUIRED)
+find_package(kelo_platform REQUIRED)
 find_package(kelo-kindyn REQUIRED)
 
 # append orocos include dirs
@@ -59,7 +59,6 @@ target_include_directories(solver_utils PUBLIC
 target_link_libraries(solver_utils 
   kdl_parser
   orocos-kdl
-  kelo_motion_control
   kelo_kindyn
 )
 
@@ -82,7 +81,7 @@ target_link_libraries(mutils
   kdl_parser
   orocos-kdl
   kinova_mediator
-  # KortexApiCpp
+  kelo_platform::kelo_mediator
   pthread
   kelo_kindyn
   tf_utils

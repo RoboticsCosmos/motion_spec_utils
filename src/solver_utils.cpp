@@ -23,7 +23,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#include "kelo_motion_control/mediator.h"
 #include "motion_spec_utils/solver_utils.hpp"
 
 void rne_solver(Freddy *rob, std::string root_link, std::string tip_link,
@@ -580,24 +579,24 @@ void wrench_estimator(Freddy *rob, std::string root_link, std::string tip_link,
   }
 }
 
-void base_fd_solver(Freddy *rob, double *platform_forces, double *wheel_torques)
-{
-  const unsigned int N = 3;
-  const unsigned int M = rob->mobile_base->mediator->kelo_base_config->nWheels * 2;
+// void base_fd_solver(Freddy *rob, double *platform_forces, double *wheel_torques)
+// {
+//   const unsigned int N = 3;
+//   const unsigned int M = rob->mobile_base->mediator->kelo_base_config->nWheels * 2;
 
-  TorqueControlState *torque_control_state = new TorqueControlState();
-  init_torque_control_state(torque_control_state, N, M);
-  set_weight_matrix(torque_control_state, N, M);
+//   TorqueControlState *torque_control_state = new TorqueControlState();
+//   init_torque_control_state(torque_control_state, N, M);
+//   set_weight_matrix(torque_control_state, N, M);
 
-  // *Assumption* - platform_forces is a 3D vector with forces in x, y, and moment about z
-  set_platform_force(torque_control_state, platform_forces, N);
+//   // *Assumption* - platform_forces is a 3D vector with forces in x, y, and moment about z
+//   set_platform_force(torque_control_state, platform_forces, N);
 
-  compute_wheel_torques(rob->mobile_base->mediator->kelo_base_config, torque_control_state,
-                        rob->mobile_base->state->pivot_angles, wheel_torques, N, M);
+//   compute_wheel_torques(rob->mobile_base->mediator->kelo_base_config, torque_control_state,
+//                         rob->mobile_base->state->pivot_angles, wheel_torques, N, M);
 
-  free_torque_control_state(torque_control_state);
-  delete torque_control_state;
-}
+//   free_torque_control_state(torque_control_state);
+//   delete torque_control_state;
+// }
 
 void get_pivot_alignment_offsets(Freddy *robot, double *platform_force, double *lin_offsets,
                                  double *ang_offsets)
@@ -765,4 +764,67 @@ void base_fd_solver_with_alignment(Freddy *robot, double *platform_force, double
   //           force_dist_mat_whl,
   //           wheel_torques,
   //           f_platform_out);
+}
+
+void base_fd_solver_cgls(Freddy *robot, double *platform_force, double *alignment_taus,
+                                    double *wheel_torques)
+{
+  assert(platform_force);
+  assert(wheel_torques);
+
+  size_t nWheels = robot->mobile_base->mediator->kelo_base_config->nWheels;
+  assert(nWheels > 0);
+
+  assert(alignment_taus);
+
+  // transform the platform force by 90 degrees ccw
+  Eigen::Rotation2Dd pf_correction_rot(M_PI / 2);
+  Eigen::Vector2d lin_pf = Eigen::Vector2d(platform_force[0], platform_force[1]);
+  // lin_pf = pf_correction_rot * lin_pf;
+
+  double pf[3] = {lin_pf.x(), lin_pf.y(), platform_force[2]};
+
+  double tau_wheel_ref[nWheels * 2]{};
+  for (size_t i = 0; i < nWheels; i++)
+  {
+    tau_wheel_ref[2 * i] = -alignment_taus[i];
+    tau_wheel_ref[2 * i + 1] = -alignment_taus[i];
+  }
+
+  // solver
+  // initialize variables
+  double caster_offsets[nWheels]{};
+  for (size_t i = 0; i < nWheels; i++)
+  {
+    caster_offsets[i] = robot->mobile_base->mediator->kelo_base_config->castor_offset;
+  }
+
+  double wheel_distances[nWheels]{};
+  for (size_t i = 0; i < nWheels; i++)
+  {
+    wheel_distances[i] = robot->mobile_base->mediator->kelo_base_config->half_wheel_distance * 2;
+  }
+
+  double wheel_diameters[8]{};
+  for (size_t i = 0; i < nWheels * 2; i++)
+  {
+    wheel_diameters[i] = robot->mobile_base->mediator->kelo_base_config->radius * 2;
+  }
+
+  double w_drive[nWheels * nWheels] = {
+      // [1/N^2]
+      1.0, 0.0, 0.0, 1.0,  // fl-xx, fl-xy, fl-yx, fl-yy
+      1.0, 0.0, 0.0, 1.0,  // rl-xx, rl-xy, rl-yx, rl-yy
+      1.0, 0.0, 0.0, 1.0,  // rr-xx, rr-xy, rr-yx, rr-yy
+      1.0, 0.0, 0.0, 1.0   // fr-xx, fr-xy, fr-yx, fr-yy
+  };
+
+  double force_dist_mat_whl[3 * 2 * nWheels];
+  kelo_pltf_frc_comp_mat_whl(nWheels,
+                             robot->mobile_base->mediator->kelo_base_config->wheel_coordinates,
+                             caster_offsets, wheel_distances, wheel_diameters,
+                             robot->mobile_base->state->pivot_angles, force_dist_mat_whl);
+
+  kelo_pltf_slv_inv_frc_dist_cgls(nWheels, force_dist_mat_whl, w_drive, pf, tau_wheel_ref,
+                                  wheel_torques);
 }
