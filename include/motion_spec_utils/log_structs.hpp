@@ -632,6 +632,128 @@ struct LogMobileBaseDataVector
   }
 };
 
+struct LogWheelAlignData
+{
+  double pivot_angles[4];
+  double platform_force[3];
+  double tau_command[8];
+  double tau_command_scaled[8];
+
+  double f_drive_ref[8];
+  double f_krnl[8];
+  double f_null[8];
+  double f_null_scale_factor = 0.0;
+  double f_null_scaled[8];
+  double f_drv[8];
+  double f_wheel[8];
+
+  void populate(double *pivot_angles, double *platform_force, double *tau_command, double *tau_command_scaled,
+                double *f_drive_ref, double *f_krnl, double *f_null, double f_null_scale_factor,
+                double *f_null_scaled, double *f_drv, double *f_wheel)
+  {
+    std::memcpy(this->pivot_angles, pivot_angles, sizeof(this->pivot_angles));
+    std::memcpy(this->platform_force, platform_force, sizeof(this->platform_force));
+    std::memcpy(this->tau_command, tau_command, sizeof(this->tau_command));
+    std::memcpy(this->tau_command_scaled, tau_command_scaled, sizeof(this->tau_command_scaled));
+
+    std::memcpy(this->f_drive_ref, f_drive_ref, sizeof(this->f_drive_ref));
+    std::memcpy(this->f_krnl, f_krnl, sizeof(this->f_krnl));
+    std::memcpy(this->f_null, f_null, sizeof(this->f_null));
+    this->f_null_scale_factor = f_null_scale_factor;
+    std::memcpy(this->f_null_scaled, f_null_scaled, sizeof(this->f_null_scaled));
+    std::memcpy(this->f_drv, f_drv, sizeof(this->f_drv));
+    std::memcpy(this->f_wheel, f_wheel, sizeof(this->f_wheel));
+  }
+};
+
+struct LogWheelAlignDataVector
+{
+  std::vector<LogWheelAlignData> log_data;
+
+  std::string log_dir;
+  std::string filename;
+  FILE *file;
+  int write_frequency = 0;
+
+  // constructor
+  LogWheelAlignDataVector(std::string log_dir, int write_frequency = 50)
+  {
+    this->log_dir = log_dir;
+    this->write_frequency = write_frequency;
+
+    // create the filename
+    this->filename = log_dir + "/wheel_align_log.csv";
+
+    // create the file
+    this->file = fopen(this->filename.c_str(), "w");
+    if (this->file == NULL)
+    {
+      std::cerr << "Error opening file: " << this->filename << std::endl;
+      exit(1);
+    }
+
+    // write the header
+    fprintf(file,
+            "pivot_1,pivot_2,pivot_3,pivot_4,pf_x,pf_y,pf_z,"
+            "tau_c_1,tau_c_2,tau_c_3,tau_c_4,tau_c_5,tau_c_6,tau_c_7,tau_c_8,"
+            "tau_c_scaled_1,tau_c_scaled_2,tau_c_scaled_3,tau_c_scaled_4,tau_c_scaled_5,"
+            "f_drive_ref_1,f_drive_ref_2,f_drive_ref_3,f_drive_ref_4,f_drive_ref_5,f_drive_ref_6,"
+            "f_drive_ref_7,f_drive_ref_8,"
+            "f_krnl_1,f_krnl_2,f_krnl_3,f_krnl_4,f_krnl_5,f_krnl_6,f_krnl_7,f_krnl_8,"
+            "f_null_1,f_null_2,f_null_3,f_null_4,f_null_5,f_null_6,f_null_7,f_null_8,"
+            "f_null_scale_factor,"
+            "f_null_scaled_1,f_null_scaled_2,f_null_scaled_3,f_null_scaled_4,f_null_scaled_5,"
+            "f_null_scaled_6,f_null_scaled_7,f_null_scaled_8,"
+            "f_drv_1,f_drv_2,f_drv_3,f_drv_4,f_drv_5,f_drv_6,f_drv_7,f_drv_8,"
+            "f_wheel_1,f_wheel_2,f_wheel_3,f_wheel_4,f_wheel_5,f_wheel_6,f_wheel_7,f_wheel_8\n");
+  }
+
+  // destructor
+  ~LogWheelAlignDataVector()
+  {
+    fclose(this->file);
+  }
+
+  void addWheelAlignData(double *pivot_angles, double *platform_force, double *tau_command, double *tau_command_scaled,
+                         double *f_drive_ref, double *f_krnl, double *f_null, double f_null_scale_factor,
+                         double *f_null_scaled, double *f_drv, double *f_wheel)
+  {
+    LogWheelAlignData data;
+    data.populate(pivot_angles, platform_force, tau_command, tau_command_scaled, f_drive_ref, f_krnl, f_null,
+                  f_null_scale_factor, f_null_scaled, f_drv, f_wheel);
+    this->log_data.push_back(data);
+
+    if (this->log_data.size() >= this->write_frequency)
+    {
+      writeToOpenFile();
+    }
+  }
+
+  void writeToOpenFile()
+  {
+    for (size_t i = 0; i < this->log_data.size(); i++)
+    {
+      // append all the data to a string
+      std::stringstream ss;
+      appendArrayToStream(ss, this->log_data[i].pivot_angles, 4);
+      appendArrayToStream(ss, this->log_data[i].platform_force, 3);
+      appendArrayToStream(ss, this->log_data[i].tau_command, 8);
+      appendArrayToStream(ss, this->log_data[i].f_drive_ref, 8);
+      appendArrayToStream(ss, this->log_data[i].f_krnl, 8);
+      appendArrayToStream(ss, this->log_data[i].f_null, 8);
+      ss << this->log_data[i].f_null_scale_factor << ",";
+      appendArrayToStream(ss, this->log_data[i].f_null_scaled, 8);
+      appendArrayToStream(ss, this->log_data[i].f_drv, 8);
+      appendArrayToStream(ss, this->log_data[i].f_wheel, 8);
+
+      // write the string to the file
+      fprintf(file, "%s\n", ss.str().c_str());
+    }
+    // clear the data
+    this->log_data.clear();
+  }
+};
+
 struct LogMobileBaseVoltageCurrentData
 {
   double bus_voltages[4];

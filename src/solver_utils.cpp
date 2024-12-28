@@ -784,12 +784,12 @@ void base_fd_solver_cgls(Freddy *robot, double *platform_force, double *alignmen
 
   double pf[3] = {lin_pf.x(), lin_pf.y(), platform_force[2]};
 
-  double tau_wheel_ref[nWheels * 2]{};
-  for (size_t i = 0; i < nWheels; i++)
-  {
-    tau_wheel_ref[2 * i] = -alignment_taus[i];
-    tau_wheel_ref[2 * i + 1] = -alignment_taus[i];
-  }
+  // double tau_wheel_ref[nWheels * 2]{};
+  // for (size_t i = 0; i < nWheels; i++)
+  // {
+  //   tau_wheel_ref[2 * i] = -alignment_taus[i];
+  //   tau_wheel_ref[2 * i + 1] = -alignment_taus[i];
+  // }
 
   // solver
   // initialize variables
@@ -825,6 +825,6 @@ void base_fd_solver_cgls(Freddy *robot, double *platform_force, double *alignmen
                              caster_offsets, wheel_distances, wheel_diameters,
                              robot->mobile_base->state->pivot_angles, force_dist_mat_whl);
 
-  kelo_pltf_slv_inv_frc_dist_cgls(nWheels, force_dist_mat_whl, w_drive, pf, tau_wheel_ref,
+  kelo_pltf_slv_inv_frc_dist_cgls(nWheels, force_dist_mat_whl, w_drive, pf, alignment_taus,
                                   wheel_torques);
 }
