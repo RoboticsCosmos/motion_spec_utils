@@ -17,60 +17,41 @@ void appendArrayToStream(std::stringstream &ss, double *arr, size_t size)
 
 struct LogControlData
 {
-  double measured_value = 0.0;
-  double reference_value = 0.0;
-  double error = 0.0;
   double control_singal = 0.0;
 
-  double p, i, d, error_sum = 0.0;
-  double stiffness, damping = 0.0;
+  double p, i, d, error, error_sum, prev_error = 0.0;
 
-  void populate(double measured_value, double reference_value, double error, double control_signal)
-  {
-    this->measured_value = measured_value;
-    this->reference_value = reference_value;
-    this->error = error;
-    this->control_singal = control_signal;
-  }
-
-  void populate_pid_ctrl(double p, double i, double d, double error_sum)
+  void populate(double p, double i, double d, double error, double error_sum, double prev_error, double control_singal)
   {
     this->p = p;
     this->i = i;
     this->d = d;
+    this->error = error;
     this->error_sum = error_sum;
-  }
-
-  void populate_impedance_ctrl(double stiffness, double damping)
-  {
-    this->stiffness = stiffness;
-    this->damping = damping;
+    this->prev_error = prev_error;
+    this->control_singal = control_singal;
   }
 };
 
 struct LogControlDataVector
 {
-  std::string control_variable;
-  std::string controller_type;
-  std::vector<LogControlData> control_data;
+  std::vector<LogControlData> log_data;
 
+  std::string name;
   std::string log_dir;
   std::string filename;
   FILE *file;
-
   int write_frequency = 0;
 
   // constructor
-  LogControlDataVector(std::string control_variable, std::string controller_type,
-                       std::string log_dir, int write_frequency = 50)
+  LogControlDataVector(std::string name, std::string log_dir, int write_frequency = 50)
   {
-    this->control_variable = control_variable;
-    this->controller_type = controller_type;
     this->log_dir = log_dir;
     this->write_frequency = write_frequency;
+    this->name = name;
 
     // create the filename
-    this->filename = log_dir + "/control_log_" + control_variable + "_" + controller_type + ".csv";
+    this->filename = log_dir + "/control_log_" + name + ".csv";
 
     // create the file
     this->file = fopen(this->filename.c_str(), "w");
@@ -81,14 +62,7 @@ struct LogControlDataVector
     }
 
     // write the header
-    if (controller_type == "pid")
-    {
-      fprintf(file, "measured_value,reference_value,error,control_signal,p,i,d,error_sum\n");
-    }
-    else if (controller_type == "impedance")
-    {
-      fprintf(file, "measured_value,reference_value,control_signal,stiffness,damping\n");
-    }
+    fprintf(file, "p,i,d,error,error_sum,prev_error,control_singal\n");
   }
 
   // destructor
@@ -97,29 +71,13 @@ struct LogControlDataVector
     fclose(this->file);
   }
 
-  void addControlDataPID(double measured_value, double reference_value, double error,
-                         double control_signal, double p, double i, double d, double error_sum)
+  void addControlData(double p, double i, double d, double error, double error_sum, double prev_error, double control_singal)
   {
     LogControlData data;
-    data.populate(measured_value, reference_value, error, control_signal);
-    data.populate_pid_ctrl(p, i, d, error_sum);
-    this->control_data.push_back(data);
+    data.populate(p, i, d, error, error_sum, prev_error, control_singal);
+    this->log_data.push_back(data);
 
-    if (this->control_data.size() >= this->write_frequency)
-    {
-      writeToOpenFile();
-    }
-  }
-
-  void addControlDataImpedance(double measured_value, double reference_value, double error,
-                               double control_signal, double stiffness, double damping)
-  {
-    LogControlData data;
-    data.populate(measured_value, reference_value, error, control_signal);
-    data.populate_impedance_ctrl(stiffness, damping);
-    this->control_data.push_back(data);
-
-    if (this->control_data.size() >= 50)
+    if (this->log_data.size() >= this->write_frequency)
     {
       writeToOpenFile();
     }
@@ -127,29 +85,19 @@ struct LogControlDataVector
 
   void writeToOpenFile()
   {
-    for (size_t i = 0; i < this->control_data.size(); i++)
+    for (size_t i = 0; i < this->log_data.size(); i++)
     {
       // append all the data to a string
       std::stringstream ss;
-      ss << this->control_data[i].reference_value << "," << this->control_data[i].measured_value
-         << "," << this->control_data[i].error << "," << this->control_data[i].control_singal
-         << ",";
-
-      if (this->controller_type == "pid")
-      {
-        ss << this->control_data[i].p << "," << this->control_data[i].i << ","
-           << this->control_data[i].d << "," << this->control_data[i].error_sum;
-      }
-      else if (this->controller_type == "impedance")
-      {
-        ss << this->control_data[i].stiffness << "," << this->control_data[i].damping;
-      }
+      ss << this->log_data[i].p << "," << this->log_data[i].i << "," << this->log_data[i].d << ","
+         << this->log_data[i].error << "," << this->log_data[i].error_sum << ","
+         << this->log_data[i].prev_error << "," << this->log_data[i].control_singal;
 
       // write the string to the file
       fprintf(file, "%s\n", ss.str().c_str());
     }
     // clear the data
-    this->control_data.clear();
+    this->log_data.clear();
   }
 };
 
@@ -738,6 +686,7 @@ struct LogWheelAlignDataVector
       appendArrayToStream(ss, this->log_data[i].pivot_angles, 4);
       appendArrayToStream(ss, this->log_data[i].platform_force, 3);
       appendArrayToStream(ss, this->log_data[i].tau_command, 8);
+      appendArrayToStream(ss, this->log_data[i].tau_command_scaled, 8);
       appendArrayToStream(ss, this->log_data[i].f_drive_ref, 8);
       appendArrayToStream(ss, this->log_data[i].f_krnl, 8);
       appendArrayToStream(ss, this->log_data[i].f_null, 8);
